@@ -137,7 +137,6 @@ struct Command {
 };
 
 static std::unordered_map<std::string, Command> gCommands;
-static bool gHasSubCommand = true;
 
 #define REGISTER_CMD(cmdName, desc, use, params, ex, hdl) \
     gCommands[cmdName] = {cmdName, desc, use, params, ex, hdl}

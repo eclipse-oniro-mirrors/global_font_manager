@@ -39,7 +39,10 @@ ohos_cli_executable("ohos-fontManager") {
     "src/utils.cpp",
   ]
 
-  include_dirs = [ "src" ]
+  include_dirs = [
+    "src",
+    "../../common/include",
+  ]
 
   deps = [
     "//base/global/font_manager/service:font_manager_client",
