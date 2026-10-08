@@ -15,24 +15,40 @@
 
 #include "utils.h"
 
-int OutputSuccess(const json& data)
+#include <cstdlib>
+
+int OutputSuccess(cJSON *data)
 {
-    json response;
-    response["type"] = "result";
-    response["status"] = "success";
-    response["data"] = data;
-    fprintf(stdout, "%s\n", response.dump().c_str());
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "type", "result");
+    cJSON_AddStringToObject(response, "status", "success");
+    cJSON_AddItemToObject(response, "data", data);
+    char *jsonStr = cJSON_PrintUnformatted(response);
+    if (jsonStr != nullptr) {
+        (void)fprintf(stdout, "%s\n", jsonStr);
+        free(jsonStr);
+    } else {
+        CLI_LOG("Failed to serialize success response: out of memory");
+    }
+    cJSON_Delete(response);
     return 0;
 }
 
-int OutputError(const std::string& code, const std::string& message, const std::string& suggestion)
+int OutputError(const std::string &code, const std::string &message, const std::string &suggestion)
 {
-    json response;
-    response["type"] = "result";
-    response["status"] = "failed";
-    response["errCode"] = code;
-    response["errMsg"] = message;
-    response["suggestion"] = suggestion;
-    fprintf(stdout, "%s\n", response.dump().c_str());
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddStringToObject(response, "type", "result");
+    cJSON_AddStringToObject(response, "status", "failed");
+    cJSON_AddStringToObject(response, "errCode", code.c_str());
+    cJSON_AddStringToObject(response, "errMsg", message.c_str());
+    cJSON_AddStringToObject(response, "suggestion", suggestion.c_str());
+    char *jsonStr = cJSON_PrintUnformatted(response);
+    if (jsonStr != nullptr) {
+        (void)fprintf(stdout, "%s\n", jsonStr);
+        free(jsonStr);
+    } else {
+        CLI_LOG("Failed to serialize error response: out of memory");
+    }
+    cJSON_Delete(response);
     return 1;
 }

@@ -20,12 +20,10 @@
 #include <unordered_map>
 #include <functional>
 
-#include <nlohmann/json.hpp>
+#include <cJSON.h>
 
 #include "utils.h"
 #include "font_manager_kits.h"
-
-using json = nlohmann::json;
 
 namespace {
 // Font manager error codes (mirrors font_define.h FontErrorCode enum)
@@ -248,9 +246,9 @@ int CmdInstall(int argc, char** argv)
         return OutputError(errInfo.errCode, errInfo.errMsg, errInfo.suggestion);
     }
 
-    json data;
-    data["message"] = "Font installed successfully";
-    data["fontPath"] = fontPath;
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddStringToObject(data, "message", "Font installed successfully");
+    cJSON_AddStringToObject(data, "fontPath", fontPath.c_str());
     return OutputSuccess(data);
 }
 
@@ -294,9 +292,9 @@ int CmdUninstall(int argc, char** argv)
         return OutputError(errInfo.errCode, errInfo.errMsg, errInfo.suggestion);
     }
 
-    json data;
-    data["message"] = "Font uninstalled successfully";
-    data["fontName"] = fontName;
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddStringToObject(data, "message", "Font uninstalled successfully");
+    cJSON_AddStringToObject(data, "fontName", fontName.c_str());
     return OutputSuccess(data);
 }
 

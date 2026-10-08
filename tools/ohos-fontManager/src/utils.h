@@ -18,25 +18,22 @@
 
 #include <cstdio>
 #include <string>
-#include <nlohmann/json.hpp>
 
-using json = nlohmann::json;
+#include <cJSON.h>
 
-// Log macros — all output goes to stdout
+#ifndef CLI_LOG
 #define CLI_LOG(fmt, ...) do { \
     fprintf(stdout, "[INFO] " fmt "\n", ##__VA_ARGS__); \
 } while (0)
+#endif
 
+#ifndef CLI_ERROR
 #define CLI_ERROR(fmt, ...) do { \
     fprintf(stdout, "[ERROR] " fmt "\n", ##__VA_ARGS__); \
 } while (0)
+#endif
 
-// Output success JSON response to stdout.
-// Returns 0 for use as exit code.
-int OutputSuccess(const json& data);
-
-// Output error JSON response to stdout.
-// Returns 1 for use as exit code.
-int OutputError(const std::string& code, const std::string& message, const std::string& suggestion);
+int OutputSuccess(cJSON *data);
+int OutputError(const std::string &code, const std::string &message, const std::string &suggestion);
 
 #endif  // OHOS_FONT_MANAGER_CLI_UTILS_H
