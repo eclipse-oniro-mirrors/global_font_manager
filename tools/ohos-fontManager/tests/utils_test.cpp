@@ -58,7 +58,7 @@ HWTEST_F(UtilsTest, OutputSuccess_ValidJson, TestSize.Level1)
     cJSON_AddStringToObject(data, "message", "Font installed successfully");
     cJSON_AddStringToObject(data, "fontPath", "/data/local/tmp/custom.ttf");
 
-    std::string output = CaptureStdout([&]() {
+    std::string output = CaptureStdout([&data]() {
         OutputSuccess(data);
     });
 
@@ -78,7 +78,7 @@ HWTEST_F(UtilsTest, OutputSuccess_ValidJson, TestSize.Level1)
 
 HWTEST_F(UtilsTest, OutputError_ValidJson, TestSize.Level1)
 {
-    std::string output = CaptureStdout([&]() {
+    std::string output = CaptureStdout([]() {
         OutputError("ERR_PERMISSION_DENIED",
             "Permission verification failed.",
             "Add ohos.permission.UPDATE_FONT permission");
@@ -100,7 +100,7 @@ HWTEST_F(UtilsTest, OutputError_ValidJson, TestSize.Level1)
 
 HWTEST_F(UtilsTest, OutputError_EmptyFields, TestSize.Level1)
 {
-    std::string output = CaptureStdout([&]() {
+    std::string output = CaptureStdout([]() {
         OutputError("", "", "");
     });
 
