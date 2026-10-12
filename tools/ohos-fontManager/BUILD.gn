@@ -13,52 +13,58 @@
 
 import("//build/ohos.gni")
 import("//build/ohos/cli/ohos_cli_executable.gni")
+import("//base/global/font_manager/font_manager.gni")
 
-ohos_cli_executable("ohos-fontManager") {
-  branch_protector_ret = "pac_ret"
-  cli_config_file = "config.json"
+if (font_manager_feature_cli) {
+  ohos_cli_executable("ohos-fontManager") {
+    branch_protector_ret = "pac_ret"
+    cli_config_file = "config.json"
 
-  sanitize = {
-    cfi = true
-    cfi_cross_dso = true
-    debug = false
+    sanitize = {
+      cfi = true
+      cfi_cross_dso = true
+      debug = false
+    }
+
+    cflags = [
+      "-fPIC",
+      "-g",
+      "-Wall",
+    ]
+    if (target_cpu == "arm") {
+      cflags += [ "-DBINDER_IPC_32BIT" ]
+    }
+    cflags_cc = cflags
+
+    sources = [
+      "src/main.cpp",
+      "src/utils.cpp",
+      "src/font_error.cpp",
+      "src/param_parser.cpp",
+    ]
+
+    include_dirs = [
+      "src",
+      "../../common/include",
+    ]
+
+    deps = [
+      "//base/global/font_manager/service:font_manager_client",
+    ]
+
+    external_deps = [
+      "cJSON:cjson",
+      "hilog:libhilog",
+    ]
+
+    subsystem_name = "global"
+    part_name = "font_manager"
+
+    install_enable = true
+    install_images = [ "system" ]
+    relative_install_dir = "cli_tool/executable"
   }
-
-  cflags = [
-    "-fPIC",
-    "-g",
-    "-Wall",
-  ]
-  if (target_cpu == "arm") {
-    cflags += [ "-DBINDER_IPC_32BIT" ]
+} else {
+  group("ohos-fontManager") {
   }
-  cflags_cc = cflags
-
-  sources = [
-    "src/main.cpp",
-    "src/utils.cpp",
-    "src/font_error.cpp",
-    "src/param_parser.cpp",
-  ]
-
-  include_dirs = [
-    "src",
-    "../../common/include",
-  ]
-
-  deps = [
-    "//base/global/font_manager/service:font_manager_client",
-  ]
-
-  external_deps = [
-    "cJSON:cjson",
-    "hilog:libhilog",
-  ]
-
-  subsystem_name = "global"
-  part_name = "font_manager"
-
-  install_enable = true
-  install_images = [ "system" ]
-  relative_install_dir = "cli_tool/executable"
 }
