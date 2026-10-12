@@ -27,10 +27,9 @@
 
 namespace {
 // Font manager error codes (mirrors font_define.h FontErrorCode enum)
+// Only includes codes that can actually be returned by InstallFont/UninstallFont
 constexpr int32_t FM_ERR_OK = 0;
 constexpr int32_t FM_ERR_NO_PERMISSION = 201;
-constexpr int32_t FM_ERR_NOT_SYSTEM_APP = 202;
-constexpr int32_t FM_ERR_INVALID_PARAM = 401;
 constexpr int32_t FM_ERR_FILE_NOT_EXISTS = 31100101;
 constexpr int32_t FM_ERR_FILE_VERIFY_FAIL = 31100102;
 constexpr int32_t FM_ERR_COPY_FAIL = 31100103;
@@ -40,8 +39,6 @@ constexpr int32_t FM_ERR_INSTALL_FAIL = 31100106;
 constexpr int32_t FM_ERR_UNINSTALL_FILE_NOT_EXISTS = 31100107;
 constexpr int32_t FM_ERR_UNINSTALL_REMOVE_FAIL = 31100108;
 constexpr int32_t FM_ERR_UNINSTALL_FAIL = 31100109;
-constexpr int32_t FM_ERR_SYSTEM_ERROR = 31100110;
-constexpr int32_t FM_ERR_DATA_MIGRATIONING = 31100111;
 
 const char* const kProgramName = "ohos-fontManager";
 const char* const kToolDescription =
@@ -62,47 +59,36 @@ struct ErrorEntry {
 
 const ErrorEntry gErrorTable[] = {
     {FM_ERR_NO_PERMISSION, "ERR_PERMISSION_DENIED",
-     "Permission denied: ohos.permission.UPDATE_FONT is required to manage fonts",
+     "Permission verification failed. The application does not "
+     "have the permission required to call the API.",
      "Add ohos.permission.UPDATE_FONT in module.json5 and ensure granted"},
-    {FM_ERR_NOT_SYSTEM_APP, "ERR_PERMISSION_DENIED",
-     "Permission denied: system app privilege is required to manage fonts",
-     "Ensure the caller process has system app privilege"},
-    {FM_ERR_INVALID_PARAM, "ERR_ARG_INVALID",
-     "Invalid parameter provided to font manager",
-     "Check the parameter format and value"},
     {FM_ERR_FILE_NOT_EXISTS, "ERR_RESOURCE_NOT_FOUND",
-     "Font file does not exist or cannot be opened",
+     "The font does not exist.",
      "Verify the font file path is correct and the file is readable"},
     {FM_ERR_FILE_VERIFY_FAIL, "ERR_FM_FILE_VERIFY_FAIL",
-     "Font file verification failed: the file is not a valid font",
+     "The font is not supported.",
      "Use a valid font file format such as .ttf or .otf"},
     {FM_ERR_COPY_FAIL, "ERR_FM_COPY_FAIL",
-     "Font file copy failed during installation",
+     "Failed to copy the font file.",
      "Check storage space and write permissions on font directory"},
     {FM_ERR_INSTALLED_ALREADY, "ERR_RESOURCE_EXISTS",
-     "Font is already installed in the system",
+     "The font file is installed.",
      "Use 'ohos-fontManager uninstall --font-name <name>' to remove first"},
     {FM_ERR_MAX_FILE_COUNT, "ERR_FM_MAX_COUNT",
-     "Maximum font installation count reached (default limit: 200)",
+     "Exceeded the maximum number of installed files.",
      "Uninstall unused fonts before installing new ones"},
     {FM_ERR_INSTALL_FAIL, "ERR_FM_INSTALL_FAIL",
-     "Font installation failed due to a service error",
+     "The system ability works abnormally.",
      "Check if font_manager service (SA ID 66262) is running and retry"},
     {FM_ERR_UNINSTALL_FILE_NOT_EXISTS, "ERR_RESOURCE_NOT_FOUND",
-     "Font not found for uninstall: the specified font name is not installed",
+     "The font file does not exist.",
      "Verify the font name is correct and the font is installed"},
     {FM_ERR_UNINSTALL_REMOVE_FAIL, "ERR_FM_REMOVE_FAIL",
-     "Font file removal failed during uninstall",
+     "Failed to delete the font file.",
      "Check file permissions on the font directory and retry"},
     {FM_ERR_UNINSTALL_FAIL, "ERR_FM_UNINSTALL_FAIL",
-     "Font uninstall failed due to a service error",
+     "The system ability works abnormally.",
      "Check if font_manager service (SA ID 66262) is running and retry"},
-    {FM_ERR_SYSTEM_ERROR, "ERR_INTERNAL_ERROR",
-     "System error occurred during font operation",
-     "Retry; if the problem persists, contact system administrator"},
-    {FM_ERR_DATA_MIGRATIONING, "ERR_FM_MIGRATING",
-     "Data migration is in progress, font operation cannot proceed",
-     "Wait for data migration to complete and retry"},
 };
 
 ErrorInfo MapFontError(int32_t code)

@@ -40,8 +40,6 @@ ohos-fontManager <command> [options]
 |--------|------|----------|
 | ERR_OK (0) | 成功 | 操作成功完成 |
 | ERR_NO_PERMISSION (201) | 权限不足 | 缺少 ohos.permission.UPDATE_FONT 权限 |
-| ERR_NOT_SYSTEM_APP (202) | 非系统应用 | 调用方不是系统应用 |
-| ERR_INVALID_PARAM (401) | 参数无效 | 参数格式或值不合法 |
 | ERR_FILE_NOT_EXISTS (31100101) | 文件不存在 | 字体文件路径不存在或无法打开 |
 | ERR_FILE_VERIFY_FAIL (31100102) | 文件验证失败 | 文件不是有效的字体格式 |
 | ERR_COPY_FAIL (31100103) | 文件拷贝失败 | 安装过程中字体文件拷贝失败 |
@@ -51,8 +49,6 @@ ohos-fontManager <command> [options]
 | ERR_UNINSTALL_FILE_NOT_EXISTS (31100107) | 字体不存在 | 指定名称的字体未安装 |
 | ERR_UNINSTALL_REMOVE_FAIL (31100108) | 删除失败 | 卸载过程中字体文件删除失败 |
 | ERR_UNINSTALL_FAIL (31100109) | 卸载失败 | 字体服务不可用或卸载操作失败 |
-| ERR_SYSTEM_ERROR (31100110) | 系统错误 | 系统内部错误 |
-| ERR_DATA_MIGRATIONING (31100111) | 数据迁移中 | 数据迁移正在进行，无法执行字体操作 |
 
 ## 示例
 
