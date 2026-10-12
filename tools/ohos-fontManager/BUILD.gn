@@ -37,6 +37,8 @@ ohos_cli_executable("ohos-fontManager") {
   sources = [
     "src/main.cpp",
     "src/utils.cpp",
+    "src/font_error.cpp",
+    "src/param_parser.cpp",
   ]
 
   include_dirs = [

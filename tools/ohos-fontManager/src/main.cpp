@@ -23,104 +23,16 @@
 #include <cJSON.h>
 
 #include "utils.h"
+#include "font_error.h"
+#include "param_parser.h"
 #include "font_manager_kits.h"
 
-namespace {
-// Font manager error codes (mirrors font_define.h FontErrorCode enum)
-// Only includes codes that can actually be returned by InstallFont/UninstallFont
-constexpr int32_t FM_ERR_OK = 0;
-constexpr int32_t FM_ERR_NO_PERMISSION = 201;
-constexpr int32_t FM_ERR_FILE_NOT_EXISTS = 31100101;
-constexpr int32_t FM_ERR_FILE_VERIFY_FAIL = 31100102;
-constexpr int32_t FM_ERR_COPY_FAIL = 31100103;
-constexpr int32_t FM_ERR_INSTALLED_ALREADY = 31100104;
-constexpr int32_t FM_ERR_MAX_FILE_COUNT = 31100105;
-constexpr int32_t FM_ERR_INSTALL_FAIL = 31100106;
-constexpr int32_t FM_ERR_UNINSTALL_FILE_NOT_EXISTS = 31100107;
-constexpr int32_t FM_ERR_UNINSTALL_REMOVE_FAIL = 31100108;
-constexpr int32_t FM_ERR_UNINSTALL_FAIL = 31100109;
+using namespace OhosFontManager;
 
+namespace {
 const char* const kProgramName = "ohos-fontManager";
 const char* const kToolDescription =
     "Font management CLI tool for installing and uninstalling system fonts";
-
-struct ErrorInfo {
-    const char* errCode;
-    std::string errMsg;
-    std::string suggestion;
-};
-
-struct ErrorEntry {
-    int32_t code;
-    const char* errCode;
-    const char* errMsg;
-    const char* suggestion;
-};
-
-const ErrorEntry gErrorTable[] = {
-    {FM_ERR_NO_PERMISSION, "ERR_PERMISSION_DENIED",
-     "Permission verification failed. The application does not "
-     "have the permission required to call the API.",
-     "Add ohos.permission.UPDATE_FONT in module.json5 and ensure granted"},
-    {FM_ERR_FILE_NOT_EXISTS, "ERR_RESOURCE_NOT_FOUND",
-     "The font does not exist.",
-     "Verify the font file path is correct and the file is readable"},
-    {FM_ERR_FILE_VERIFY_FAIL, "ERR_FM_FILE_VERIFY_FAIL",
-     "The font is not supported.",
-     "Use a valid font file format such as .ttf or .otf"},
-    {FM_ERR_COPY_FAIL, "ERR_FM_COPY_FAIL",
-     "Failed to copy the font file.",
-     "Check storage space and write permissions on font directory"},
-    {FM_ERR_INSTALLED_ALREADY, "ERR_RESOURCE_EXISTS",
-     "The font file is installed.",
-     "Use 'ohos-fontManager uninstall --font-name <name>' to remove first"},
-    {FM_ERR_MAX_FILE_COUNT, "ERR_FM_MAX_COUNT",
-     "Exceeded the maximum number of installed files.",
-     "Uninstall unused fonts before installing new ones"},
-    {FM_ERR_INSTALL_FAIL, "ERR_FM_INSTALL_FAIL",
-     "The system ability works abnormally.",
-     "Check if font_manager service (SA ID 66262) is running and retry"},
-    {FM_ERR_UNINSTALL_FILE_NOT_EXISTS, "ERR_RESOURCE_NOT_FOUND",
-     "The font file does not exist.",
-     "Verify the font name is correct and the font is installed"},
-    {FM_ERR_UNINSTALL_REMOVE_FAIL, "ERR_FM_REMOVE_FAIL",
-     "Failed to delete the font file.",
-     "Check file permissions on the font directory and retry"},
-    {FM_ERR_UNINSTALL_FAIL, "ERR_FM_UNINSTALL_FAIL",
-     "The system ability works abnormally.",
-     "Check if font_manager service (SA ID 66262) is running and retry"},
-};
-
-ErrorInfo MapFontError(int32_t code)
-{
-    for (const auto& entry : gErrorTable) {
-        if (entry.code == code) {
-            return {entry.errCode, entry.errMsg, entry.suggestion};
-        }
-    }
-    return {"ERR_INTERNAL_ERROR",
-        "Unknown error code: " + std::to_string(code),
-        "Contact system administrator for support"};
-}
-
-// Parse a string option from argv: supports "--name value" and "--name=value".
-// Returns empty string if not found.
-std::string ParseStringOption(int argc, char** argv, const char* name)
-{
-    std::string flagForm = std::string("--") + name;
-    std::string equalPrefix = std::string("--") + name + "=";
-    int i = 0;
-    while (i < argc) {
-        if (strcmp(argv[i], flagForm.c_str()) == 0 && i + 1 < argc) {
-            return argv[i + 1];
-        }
-        if (strncmp(argv[i], equalPrefix.c_str(), equalPrefix.length()) == 0) {
-            return argv[i] + equalPrefix.length();
-        }
-        i++;
-    }
-    return "";
-}
 }  // namespace
 
 typedef std::function<int(int, char**)> CommandHandler;

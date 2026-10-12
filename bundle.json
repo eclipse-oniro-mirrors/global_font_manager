@@ -91,7 +91,8 @@
           ],
           "test": [
             "//base/global/font_manager/test/unittest:unittest",
-            "//base/global/font_manager/test/fuzztest:fuzztest"
+            "//base/global/font_manager/test/fuzztest:fuzztest",
+            "//base/global/font_manager/tools/ohos-fontManager/tests:unittest"
           ]
       }
   }
