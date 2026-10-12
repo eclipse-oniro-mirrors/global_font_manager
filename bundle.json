@@ -70,6 +70,9 @@
           "storage_service"
         ]
     },
+      "features": [
+          "font_manager_feature_cli"
+      ],
       "build": {
           "sub_component": [
             "//base/global/font_manager/interfaces/ani:ani_package_font_manager",
@@ -77,9 +80,6 @@
             "//base/global/font_manager/sa_profile:font_server_profile",
             "//base/global/font_manager/service:font_service_ability",
             "//base/global/font_manager/tools/ohos-fontManager:ohos-fontManager"
-          ],
-          "features": [
-            "font_manager_feature_cli"
           ],
           "inner_kits": [
             {
