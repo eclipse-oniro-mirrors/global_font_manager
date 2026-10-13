@@ -33,6 +33,8 @@ namespace {
 const char* const kProgramName = "ohos-fontManager";
 const char* const kToolDescription =
     "Font management CLI tool for installing and uninstalling system fonts";
+constexpr size_t MAX_FONT_PATH_LEN = 4096;
+constexpr size_t MAX_FONT_NAME_LEN = 256;
 }  // namespace
 
 typedef std::function<int(int, char**)> CommandHandler;
@@ -129,6 +131,11 @@ int CmdInstall(int argc, char** argv)
             "Provide a valid font file path. "
             "Example: ohos-fontManager install --font-path /data/local/tmp/custom.ttf");
     }
+    if (fontPath.size() > MAX_FONT_PATH_LEN) {
+        return OutputError("ERR_ARG_INVALID",
+            "Font path exceeds maximum length (4096)",
+            "Provide a shorter file path");
+    }
 
     CLI_LOG("Installing font from path: %s", fontPath.c_str());
 
@@ -163,6 +170,11 @@ int CmdUninstall(int argc, char** argv)
             "Context: uninstall command requires a font name",
             "Provide a valid font name. "
             "Example: ohos-fontManager uninstall --font-name CustomFont");
+    }
+    if (fontName.size() > MAX_FONT_NAME_LEN) {
+        return OutputError("ERR_ARG_INVALID",
+            "Font name exceeds maximum length (256)",
+            "Provide a shorter font name");
     }
 
     CLI_LOG("Uninstalling font: %s", fontName.c_str());
