@@ -425,9 +425,7 @@ static void FontObserverTsfnCallJs(napi_env env, napi_value jsCb, void* /*contex
     if (env == nullptr || jsCb == nullptr) {
         return;
     }
-    napi_value undefined = nullptr;
-    napi_get_undefined(env, &undefined);
-    napi_call_function(env, nullptr, jsCb, 1, &undefined, nullptr);
+    napi_call_function(env, nullptr, jsCb, 0, nullptr, nullptr);
 }
 
 // Env cleanup: aborts the TSFN and frees the heap-allocated shared_ptr.
@@ -487,6 +485,7 @@ napi_value FontManagerAddon::OnFontObserver(napi_env env, napi_callback_info inf
     if (agent == nullptr) {
         napi_release_threadsafe_function(ctx->tsfn, napi_tsfn_release);
         napi_release_threadsafe_function(ctx->tsfn, napi_tsfn_release);
+        ctx->tsfn = nullptr;
         napi_throw(env, CreateJsError(env, ERR_SYSTEM_ERROR, GetScopeFontErrMsg(ERR_SYSTEM_ERROR)));
         return CreateJsUndefined(env);
     }
@@ -496,12 +495,19 @@ napi_value FontManagerAddon::OnFontObserver(napi_env env, napi_callback_info inf
     // alive until the agent is destroyed, so napi_call_threadsafe_function
     // is always safe and returns napi_closing after this point.
     auto* heapCtx = new std::shared_ptr<FontObserverTsfnCtx>(ctx);
-    napi_add_env_cleanup_hook(env, FontObserverEnvCleanup, heapCtx);
+    napi_status hookStatus = napi_add_env_cleanup_hook(env, FontObserverEnvCleanup, heapCtx);
+    if (hookStatus != napi_ok) {
+        FONT_LOGE("OnFontObserver: napi_add_env_cleanup_hook failed: %{public}d", hookStatus);
+        FontObserverEnvCleanup(heapCtx);
+        napi_throw(env, CreateJsError(env, ERR_SYSTEM_ERROR, GetScopeFontErrMsg(ERR_SYSTEM_ERROR)));
+        return CreateJsUndefined(env);
+    }
 
     int32_t ret = FontManagerKits::GetInstance().OnFontObserver(agent);
     if (ret != ERR_OK) {
-        napi_remove_env_cleanup_hook(env, FontObserverEnvCleanup, heapCtx);
-        FontObserverEnvCleanup(heapCtx);
+        if (napi_remove_env_cleanup_hook(env, FontObserverEnvCleanup, heapCtx) == napi_ok) {
+            FontObserverEnvCleanup(heapCtx);
+        }
         napi_throw(env, CreateJsError(env, ret, GetScopeFontErrMsg(ret)));
         return CreateJsUndefined(env);
     }
