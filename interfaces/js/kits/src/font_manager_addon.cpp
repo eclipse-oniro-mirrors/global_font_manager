@@ -419,6 +419,12 @@ struct FontObserverTsfnCtx {
     }
 };
 
+// Heap-allocated wrapper passed to napi_add_env_cleanup_hook.
+// Holds a shared_ptr so the cleanup callback always has a valid context.
+struct FontObserverCleanupData {
+    std::shared_ptr<FontObserverTsfnCtx> ctx;
+};
+
 // Called on the JS thread by NAPI with a guaranteed-valid env.
 static void FontObserverTsfnCallJs(napi_env env, napi_value jsCb, void* /*context*/, void* /*data*/)
 {
@@ -428,18 +434,19 @@ static void FontObserverTsfnCallJs(napi_env env, napi_value jsCb, void* /*contex
     napi_call_function(env, nullptr, jsCb, 0, nullptr, nullptr);
 }
 
-// Env cleanup: aborts the TSFN and frees the heap-allocated shared_ptr.
+// Env cleanup: aborts the TSFN and frees the heap-allocated wrapper.
 // Must be a named function so napi_remove_env_cleanup_hook can match it.
 static void FontObserverEnvCleanup(void* data)
 {
-    auto* p = static_cast<std::shared_ptr<FontObserverTsfnCtx>*>(data);
-    if (*p && (*p)->tsfn != nullptr) {
-        napi_release_threadsafe_function((*p)->tsfn, napi_tsfn_abort);
+    auto* p = static_cast<FontObserverCleanupData*>(data);
+    if (p->ctx && p->ctx->tsfn != nullptr) {
+        napi_release_threadsafe_function(p->ctx->tsfn, napi_tsfn_abort);
     }
     delete p;
 }
 
-napi_value FontManagerAddon::OnFontObserver(napi_env env, napi_callback_info info)
+// Parse and validate the onServiceDied callback from JS args.
+static bool ParseOnServiceDiedCallback(napi_env env, napi_callback_info info, napi_value& onDied)
 {
     size_t argc = ARGS_SIZE_ONE;
     napi_value argv[ARGS_SIZE_ONE] = {nullptr};
@@ -448,65 +455,76 @@ napi_value FontManagerAddon::OnFontObserver(napi_env env, napi_callback_info inf
     napi_get_cb_info(env, info, &argc, argv, &thisVar, &data);
     if (argc != ARGS_SIZE_ONE) {
         napi_throw(env, CreateJsError(env, ERR_INVALID_PARAM, GetScopeFontErrMsg(ERR_INVALID_PARAM)));
-        return CreateJsUndefined(env);
+        return false;
     }
-    napi_value onDied = nullptr;
     napi_get_named_property(env, argv[ARRAY_SUBCRIPTOR_ZERO], "onServiceDied", &onDied);
     napi_valuetype type;
     napi_typeof(env, onDied, &type);
     if (type != napi_function) {
         napi_throw(env, CreateJsError(env, ERR_INVALID_PARAM, GetScopeFontErrMsg(ERR_INVALID_PARAM)));
-        return CreateJsUndefined(env);
+        return false;
     }
+    return true;
+}
 
+// Create TSFN from the JS callback, acquire an extra reference, and build
+// the death-recipient agent. Returns nullptr on failure (error already thrown).
+static sptr<FontClientObserverAgent> CreateFontObserverAgent(
+    napi_env env, napi_value onDied, std::shared_ptr<FontObserverTsfnCtx>& outCtx)
+{
     napi_value workName = nullptr;
     napi_create_string_utf8(env, "FontServiceDied", NAPI_AUTO_LENGTH, &workName);
-    auto ctx = std::make_shared<FontObserverTsfnCtx>();
+    outCtx = std::make_shared<FontObserverTsfnCtx>();
     napi_status status = napi_create_threadsafe_function(
         env, onDied, nullptr, workName, 0, 1,
         nullptr, nullptr, nullptr,
-        FontObserverTsfnCallJs, &ctx->tsfn);
-    if (status != napi_ok || ctx->tsfn == nullptr) {
+        FontObserverTsfnCallJs, &outCtx->tsfn);
+    if (status != napi_ok || outCtx->tsfn == nullptr) {
         FONT_LOGE("OnFontObserver: napi_create_threadsafe_function failed: %{public}d", status);
         napi_throw(env, CreateJsError(env, ERR_SYSTEM_ERROR, GetScopeFontErrMsg(ERR_SYSTEM_ERROR)));
-        return CreateJsUndefined(env);
+        return nullptr;
     }
-    // Acquire an extra reference so the TSFN memory stays valid
-    // after env teardown aborts it (env releases its ref, agent holds this one).
-    napi_acquire_threadsafe_function(ctx->tsfn);
-
+    napi_acquire_threadsafe_function(outCtx->tsfn);
     auto agent = sptr<FontClientObserverAgent>::MakeSptr(
-        [ctx]() {
+        [ctx = outCtx]() {
             napi_status s = napi_call_threadsafe_function(ctx->tsfn, nullptr, napi_tsfn_nonblocking);
             if (s != napi_ok && s != napi_closing) {
                 FONT_LOGE("OnFontObserver: napi_call_threadsafe_function failed: %{public}d", s);
             }
         });
     if (agent == nullptr) {
-        napi_release_threadsafe_function(ctx->tsfn, napi_tsfn_release);
-        napi_release_threadsafe_function(ctx->tsfn, napi_tsfn_release);
-        ctx->tsfn = nullptr;
+        napi_release_threadsafe_function(outCtx->tsfn, napi_tsfn_release);
+        napi_release_threadsafe_function(outCtx->tsfn, napi_tsfn_release);
+        outCtx->tsfn = nullptr;
         napi_throw(env, CreateJsError(env, ERR_SYSTEM_ERROR, GetScopeFontErrMsg(ERR_SYSTEM_ERROR)));
+        return nullptr;
+    }
+    return agent;
+}
+
+napi_value FontManagerAddon::OnFontObserver(napi_env env, napi_callback_info info)
+{
+    napi_value onDied = nullptr;
+    if (!ParseOnServiceDiedCallback(env, info, onDied)) {
         return CreateJsUndefined(env);
     }
-
-    // Release the env-owned reference when the env is torn down.
-    // The agent-held reference (via ctx shared_ptr) keeps the TSFN memory
-    // alive until the agent is destroyed, so napi_call_threadsafe_function
-    // is always safe and returns napi_closing after this point.
-    auto* heapCtx = new std::shared_ptr<FontObserverTsfnCtx>(ctx);
-    napi_status hookStatus = napi_add_env_cleanup_hook(env, FontObserverEnvCleanup, heapCtx);
+    std::shared_ptr<FontObserverTsfnCtx> ctx;
+    auto agent = CreateFontObserverAgent(env, onDied, ctx);
+    if (agent == nullptr) {
+        return CreateJsUndefined(env);
+    }
+    auto* cleanupData = new FontObserverCleanupData{ctx};
+    napi_status hookStatus = napi_add_env_cleanup_hook(env, FontObserverEnvCleanup, cleanupData);
     if (hookStatus != napi_ok) {
         FONT_LOGE("OnFontObserver: napi_add_env_cleanup_hook failed: %{public}d", hookStatus);
-        FontObserverEnvCleanup(heapCtx);
+        FontObserverEnvCleanup(cleanupData);
         napi_throw(env, CreateJsError(env, ERR_SYSTEM_ERROR, GetScopeFontErrMsg(ERR_SYSTEM_ERROR)));
         return CreateJsUndefined(env);
     }
-
     int32_t ret = FontManagerKits::GetInstance().OnFontObserver(agent);
     if (ret != ERR_OK) {
-        if (napi_remove_env_cleanup_hook(env, FontObserverEnvCleanup, heapCtx) == napi_ok) {
-            FontObserverEnvCleanup(heapCtx);
+        if (napi_remove_env_cleanup_hook(env, FontObserverEnvCleanup, cleanupData) == napi_ok) {
+            FontObserverEnvCleanup(cleanupData);
         }
         napi_throw(env, CreateJsError(env, ret, GetScopeFontErrMsg(ret)));
         return CreateJsUndefined(env);
