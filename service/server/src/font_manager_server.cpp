@@ -373,14 +373,6 @@ int32_t FontManagerServer::GetCallingUserId()
 #endif
 }
 
-std::string FontManagerServer::MakeAppIdentifier(int32_t scope, int32_t userId, int32_t tokenId)
-{
-    if (scope == FONT_SCOPE_APP) {
-        return APP_FONT_DIR_PREFIX + std::to_string(tokenId);
-    }
-    return SESSION_FONT_DIR_PREFIX + std::to_string(tokenId);
-}
-
 int32_t FontManagerServer::OnFontObserver(const sptr<IFontClientObserver>& observer)
 {
     CallingCountGuard guard(this, true);
@@ -453,7 +445,7 @@ void FontManagerServer::InstallScopeFontInner(const int32_t fd, int32_t scope,
         outValue = ERR_SYSTEM_ERROR;
         return;
     }
-    info.appIdentifier = MakeAppIdentifier(scope, userId, tokenId);
+    info.appIdentifier = FontManagerUtils::MakeAppIdentifier(scope, tokenId);
     info.userId = userId;
     outValue = FontManager::GetInstance()->InstallScopeFont(info);
 }
@@ -480,7 +472,8 @@ void FontManagerServer::UninstallScopeFontInner(const std::string &srcPath, int3
         outValue = ERR_SYSTEM_ERROR;
         return;
     }
-    outValue = FontManager::GetInstance()->UninstallScopeFont(srcPath, bundleName, userId);
+    int32_t tokenId = static_cast<int32_t>(IPCSkeleton::GetCallingTokenID());
+    outValue = FontManager::GetInstance()->UninstallScopeFont(srcPath, bundleName, tokenId, userId);
 }
 
 int32_t FontManagerServer::GetFontScope(const std::string &srcPath, int32_t &outValue)
@@ -506,7 +499,8 @@ void FontManagerServer::GetFontScopeInner(const std::string &srcPath, int32_t &o
         ret = ERR_SYSTEM_ERROR;
         return;
     }
-    int32_t scope = FontManager::GetInstance()->GetFontScope(srcPath, bundleName, userId);
+    int32_t tokenId = static_cast<int32_t>(IPCSkeleton::GetCallingTokenID());
+    int32_t scope = FontManager::GetInstance()->GetFontScope(srcPath, bundleName, tokenId, userId);
     if (scope < 0 || scope > 1) {
         ret = scope;
         return;
