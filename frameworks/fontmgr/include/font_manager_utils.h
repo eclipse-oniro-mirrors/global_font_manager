@@ -45,6 +45,7 @@ public:
     static void CleanupAppScopeFontDirs();
     static std::vector<std::string> GetFullNamesByFd(const int32_t &fd);
     static std::vector<std::string> GetFullNamesByPath(const std::string &path);
+    static std::string MakeAppIdentifier(int32_t scope, int32_t tokenId);
 private:
     static bool CreateFileWithPermission(const std::string &filePath, const std::string &defaultStr = "");
     static bool CopyFileByFd(int32_t sourceFd, int32_t targetFd);

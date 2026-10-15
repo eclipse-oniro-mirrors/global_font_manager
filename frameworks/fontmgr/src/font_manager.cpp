@@ -313,7 +313,7 @@ int32_t FontManager::CopyAndInsertScopeFont(const ScopeFontInstallInfo &info,
 }
 
 int32_t FontManager::UninstallScopeFont(const std::string &srcPath, const std::string &bundleName,
-    int32_t userId)
+    int32_t tokenId, int32_t userId)
 {
     std::string installPath = INSTALL_PATH_PREFIX + std::to_string(userId) + INSTALL_PATH_SUFFIX;
     if (srcPath.empty()) {
@@ -328,6 +328,11 @@ int32_t FontManager::UninstallScopeFont(const std::string &srcPath, const std::s
     if (record->bundleName != bundleName) {
         FONT_LOGE("UninstallScopeFont: bundleName mismatch, caller=%{public}s, owner=%{public}s",
             bundleName.c_str(), record->bundleName.c_str());
+        return ERR_SCOPE_FONT_NOT_FOUND;
+    }
+    std::string expectedAppId = FontManagerUtils::MakeAppIdentifier(record->scope, tokenId);
+    if (record->appIdentifier != expectedAppId) {
+        FONT_LOGE("UninstallScopeFont: appIdentifier mismatch, caller tokenId=%{public}d", tokenId);
         return ERR_SCOPE_FONT_NOT_FOUND;
     }
     // scope font fontPath is sandbox path, convert to real path
@@ -350,7 +355,7 @@ int32_t FontManager::UninstallScopeFont(const std::string &srcPath, const std::s
 }
 
 int32_t FontManager::GetFontScope(const std::string &srcPath, const std::string &bundleName,
-    int32_t userId)
+    int32_t tokenId, int32_t userId)
 {
     std::string installPath = INSTALL_PATH_PREFIX + std::to_string(userId) + INSTALL_PATH_SUFFIX;
     auto& fontConfig = SafeGetOrCreateConfig(userId, installPath + FONT_CONFIG_FILE);
@@ -360,6 +365,11 @@ int32_t FontManager::GetFontScope(const std::string &srcPath, const std::string 
     }
     if (record->bundleName != bundleName) {
         FONT_LOGI("GetFontScope: bundleName mismatch, caller does not own this font");
+        return ERR_SCOPE_FONT_NOT_FOUND;
+    }
+    std::string expectedAppId = FontManagerUtils::MakeAppIdentifier(record->scope, tokenId);
+    if (record->appIdentifier != expectedAppId) {
+        FONT_LOGI("GetFontScope: appIdentifier mismatch, caller tokenId=%{public}d", tokenId);
         return ERR_SCOPE_FONT_NOT_FOUND;
     }
     return record->scope;

@@ -489,6 +489,14 @@ std::vector<std::string> FontManagerUtils::GetFullNamesByPath(const std::string 
     (void)fclose(fp);
     return fullNames;
 }
+
+std::string FontManagerUtils::MakeAppIdentifier(int32_t scope, int32_t tokenId)
+{
+    if (scope == FONT_SCOPE_APP) {
+        return APP_FONT_DIR_PREFIX + std::to_string(tokenId);
+    }
+    return SESSION_FONT_DIR_PREFIX + std::to_string(tokenId);
+}
 } // namespace FontManager
 } // namespace Global
 } // namespace OHOS
