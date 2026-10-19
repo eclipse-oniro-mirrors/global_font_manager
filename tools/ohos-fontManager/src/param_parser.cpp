@@ -28,7 +28,8 @@ std::string ParseStringOption(int argc, char** argv, const char* name)
         if (strcmp(argv[i], flagForm.c_str()) == 0 && i + 1 < argc) {
             return argv[i + 1];
         }
-        if (strncmp(argv[i], equalPrefix.c_str(), equalPrefix.length()) == 0) {
+        if (strlen(argv[i]) >= equalPrefix.length() &&
+            strncmp(argv[i], equalPrefix.c_str(), equalPrefix.length()) == 0) {
             return argv[i] + equalPrefix.length();
         }
         i++;
