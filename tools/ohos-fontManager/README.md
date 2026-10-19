@@ -102,7 +102,7 @@ ohos-fontManager uninstall --help
 ## 技术特性
 
 - **同步调用**: install 和 uninstall 均为纯同步阻塞操作，无需 EventRunner
-- **SA 按需加载**: 首次调用时自动加载 font_manager_server SA（同步阻塞最长 5 秒）
+- **SA 按需加载**: 初次调用时自动加载 font_manager_server SA（同步阻塞最长 5 秒）
 - **全链路同步**: 从 inner_kits 入口 → client 文件操作 → SA 加载 → proxy IPC → server → framework，均为同步执行
 - **JSON 输出**: 所有结果通过 stdout 以标准 JSON 格式输出
 - **静态命令表**: 使用 `std::unordered_map` 进行命令分发，无 if-else 长链

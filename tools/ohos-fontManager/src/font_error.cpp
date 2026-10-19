@@ -26,7 +26,7 @@ struct ErrorEntry {
     const char* suggestion;
 };
 
-const ErrorEntry gErrorTable[] = {
+const ErrorEntry G_ERROR_TABLE[] = {
     {FM_ERR_NO_PERMISSION, "ERR_PERMISSION_DENIED",
      "Permission verification failed. The application does not "
      "have the permission required to call the API.",
@@ -62,7 +62,7 @@ const ErrorEntry gErrorTable[] = {
 
 ErrorInfo MapFontError(int32_t code)
 {
-    for (const auto& entry : gErrorTable) {
+    for (const auto& entry : G_ERROR_TABLE) {
         if (entry.code == code) {
             return {entry.errCode, entry.errMsg, entry.suggestion};
         }

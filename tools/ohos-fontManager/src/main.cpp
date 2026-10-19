@@ -30,11 +30,15 @@
 using namespace OhosFontManager;
 
 namespace {
-const char* const kProgramName = "ohos-fontManager";
-const char* const kToolDescription =
+const char* const K_PROGRAM_NAME = "ohos-fontManager";
+const char* const K_TOOL_DESCRIPTION =
     "Font management CLI tool for installing and uninstalling system fonts";
 constexpr size_t MAX_FONT_PATH_LEN = 4096;
 constexpr size_t MAX_FONT_NAME_LEN = 256;
+const int ARG_INDEX_SUB_COMMAND = 1;
+const int ARG_COUNT_WITH_SUB_COMMAND = 2;
+const int ARG_SKIP_COUNT = 2;
+const int EXIT_FAILURE_CODE = 1;
 }  // namespace
 
 typedef std::function<int(int, char**)> CommandHandler;
@@ -50,15 +54,18 @@ struct Command {
 
 static std::unordered_map<std::string, Command> gCommands;
 
-#define REGISTER_CMD(cmdName, desc, use, params, ex, hdl) \
-    gCommands[cmdName] = {cmdName, desc, use, params, ex, hdl}
+void RegisterCommand(const char* name, const char* desc, const char* use,
+    const char* params, const char* examples, CommandHandler handler)
+{
+    gCommands[name] = {name, desc, use, params, examples, handler};
+}
 
 void PrintGlobalHelp()
 {
-    CLI_LOG("%s - %s", kProgramName, kToolDescription);
+    CLI_LOG("%s - %s", K_PROGRAM_NAME, K_TOOL_DESCRIPTION);
     CLI_LOG("");
     CLI_LOG("Usage:");
-    CLI_LOG("  %s <command> [options]", kProgramName);
+    CLI_LOG("  %s <command> [options]", K_PROGRAM_NAME);
     CLI_LOG("");
     CLI_LOG("Parameters:");
     CLI_LOG("  --help                  Display this help message");
@@ -68,14 +75,14 @@ void PrintGlobalHelp()
     CLI_LOG("  uninstall               Uninstall an installed font by name");
     CLI_LOG("");
     CLI_LOG("Examples:");
-    CLI_LOG("  %s install --font-path /data/local/tmp/custom.ttf", kProgramName);
-    CLI_LOG("  %s uninstall --font-name CustomFont", kProgramName);
-    CLI_LOG("  %s install --help", kProgramName);
+    CLI_LOG("  %s install --font-path /data/local/tmp/custom.ttf", K_PROGRAM_NAME);
+    CLI_LOG("  %s uninstall --font-name CustomFont", K_PROGRAM_NAME);
+    CLI_LOG("  %s install --help", K_PROGRAM_NAME);
 }
 
 void PrintCommandHelp(const Command& cmd)
 {
-    CLI_LOG("%s %s - %s", kProgramName, cmd.name,
+    CLI_LOG("%s %s - %s", K_PROGRAM_NAME, cmd.name,
         cmd.description ? cmd.description : "N/A");
     if (cmd.usage != nullptr) {
         CLI_LOG("");
@@ -98,7 +105,7 @@ void PrintCommandHelp(const Command& cmd)
 int CmdHelp(int argc, char** argv)
 {
     std::string targetCmd;
-    for (int i = 1; i < argc; i++) {
+    for (int i = ARG_INDEX_SUB_COMMAND; i < argc; i++) {
         if (argv[i] != nullptr && argv[i][0] != '-') {
             targetCmd = argv[i];
             break;
@@ -142,7 +149,6 @@ int CmdInstall(int argc, char** argv)
     int outValue = 0;
     auto& fontManager = OHOS::Global::FontManager::FontManagerKits::GetInstance();
     int32_t ret = fontManager.InstallFont(fontPath, outValue);
-
     if (ret != FM_ERR_OK) {
         return OutputError("ERR_INTERNAL_ERROR",
             "Font service IPC call failed with code " + std::to_string(ret),
@@ -182,7 +188,6 @@ int CmdUninstall(int argc, char** argv)
     int outValue = 0;
     auto& fontManager = OHOS::Global::FontManager::FontManagerKits::GetInstance();
     int32_t ret = fontManager.UninstallFont(fontName, outValue);
-
     if (ret != FM_ERR_OK) {
         return OutputError("ERR_INTERNAL_ERROR",
             "Font service IPC call failed with code " + std::to_string(ret),
@@ -202,14 +207,14 @@ int CmdUninstall(int argc, char** argv)
 
 void InitCommands()
 {
-    REGISTER_CMD("help", "Show this help message",
+    RegisterCommand("help", "Show this help message",
         "ohos-fontManager help [command]",
         "    command          Optional. Show detailed help for a specific command.",
         "    ohos-fontManager help\n"
         "    ohos-fontManager help install",
         CmdHelp);
 
-    REGISTER_CMD("install", "Install a font from a local file into the system font directory",
+    RegisterCommand("install", "Install a font from a local file into the system font directory",
         "ohos-fontManager install --font-path <path>",
         "    --font-path <path>  Required. Font file path to install "
         "(must exist and be readable, e.g., .ttf or .otf)",
@@ -217,7 +222,7 @@ void InitCommands()
         "    ohos-fontManager install --font-path /data/local/tmp/custom.ttf",
         CmdInstall);
 
-    REGISTER_CMD("uninstall", "Uninstall an installed font by name from the system",
+    RegisterCommand("uninstall", "Uninstall an installed font by name from the system",
         "ohos-fontManager uninstall --font-name <name>",
         "    --font-name <name>  Required. Font name to uninstall "
         "(the installed font name, not a file path)",
@@ -228,26 +233,26 @@ void InitCommands()
 
 int main(int argc, char** argv)
 {
-    if (argc >= 2 && strcmp(argv[1], "--help") == 0) {
+    if (argc >= ARG_COUNT_WITH_SUB_COMMAND && strcmp(argv[ARG_INDEX_SUB_COMMAND], "--help") == 0) {
         InitCommands();
-        char* helpArgv[2] = {argv[0], nullptr};
-        CmdHelp(1, helpArgv);
+        char* helpArgv[ARG_COUNT_WITH_SUB_COMMAND] = {argv[0], nullptr};
+        CmdHelp(ARG_INDEX_SUB_COMMAND, helpArgv);
         return 0;
     }
 
-    if (argc < 2) {
+    if (argc < ARG_COUNT_WITH_SUB_COMMAND) {
         return OutputError("ERR_ARG_MISSING", "No command provided",
             "Run 'ohos-fontManager --help' to see available commands");
     }
 
     InitCommands();
 
-    std::string cmdName = argv[1];
+    std::string cmdName = argv[ARG_INDEX_SUB_COMMAND];
 
-    for (int i = 2; i < argc; i++) {
+    for (int i = ARG_SKIP_COUNT; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0) {
-            char* helpArgv[2] = {argv[0], const_cast<char*>(cmdName.c_str())};
-            CmdHelp(2, helpArgv);
+            char* helpArgv[ARG_COUNT_WITH_SUB_COMMAND] = {argv[0], const_cast<char*>(cmdName.c_str())};
+            CmdHelp(ARG_COUNT_WITH_SUB_COMMAND, helpArgv);
             return 0;
         }
     }
@@ -258,5 +263,5 @@ int main(int argc, char** argv)
             "Run 'ohos-fontManager --help' to see available commands");
     }
 
-    return it->second.handler(argc - 2, argv + 2);
+    return it->second.handler(argc - ARG_SKIP_COUNT, argv + ARG_SKIP_COUNT);
 }
