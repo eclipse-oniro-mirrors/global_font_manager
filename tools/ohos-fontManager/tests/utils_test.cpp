@@ -24,33 +24,33 @@
 
 using namespace testing::ext;
 
-static std::string CaptureStdout(std::function<void()> func)
-{
-    int pipefd[2];
-    pipe(pipefd);
-    int savedStdout = dup(STDOUT_FILENO);
-    dup2(pipefd[1], STDOUT_FILENO);
-    close(pipefd[1]);
+class UtilsTest : public testing::Test {
+protected:
+    static std::string CaptureStdout(std::function<void()> func)
+    {
+        int pipefd[2];
+        pipe(pipefd);
+        int savedStdout = dup(STDOUT_FILENO);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
 
-    func();
+        func();
 
-    fflush(stdout);
-    dup2(savedStdout, STDOUT_FILENO);
-    close(savedStdout);
+        fflush(stdout);
+        dup2(savedStdout, STDOUT_FILENO);
+        close(savedStdout);
 
-    char buf[4096] = {0};
-    read(pipefd[0], buf, sizeof(buf) - 1);
-    close(pipefd[0]);
-    return std::string(buf);
-}
+        char buf[4096] = {0};
+        read(pipefd[0], buf, sizeof(buf) - 1);
+        close(pipefd[0]);
+        return std::string(buf);
+    }
 
-static cJSON* ParseJson(const std::string& str)
-{
-    cJSON* root = cJSON_Parse(str.c_str());
-    return root;
-}
-
-class UtilsTest : public testing::Test {};
+    static cJSON* ParseJson(const std::string& str)
+    {
+        return cJSON_Parse(str.c_str());
+    }
+};
 
 HWTEST_F(UtilsTest, OutputSuccess_ValidJson, TestSize.Level1)
 {

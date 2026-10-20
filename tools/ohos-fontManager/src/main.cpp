@@ -54,10 +54,9 @@ struct Command {
 
 static std::unordered_map<std::string, Command> gCommands;
 
-void RegisterCommand(const char* name, const char* desc, const char* use,
-    const char* params, const char* examples, CommandHandler handler)
+void RegisterCommand(const std::string& name, const Command& cmd)
 {
-    gCommands[name] = {name, desc, use, params, examples, handler};
+    gCommands[name] = cmd;
 }
 
 void PrintGlobalHelp()
@@ -130,7 +129,6 @@ int CmdHelp(int argc, char** argv)
 int CmdInstall(int argc, char** argv)
 {
     std::string fontPath = ParseStringOption(argc, argv, "font-path");
-
     if (fontPath.empty()) {
         return OutputError("ERR_ARG_MISSING",
             "Missing required parameter: --font-path. "
@@ -169,7 +167,6 @@ int CmdInstall(int argc, char** argv)
 int CmdUninstall(int argc, char** argv)
 {
     std::string fontName = ParseStringOption(argc, argv, "font-name");
-
     if (fontName.empty()) {
         return OutputError("ERR_ARG_MISSING",
             "Missing required parameter: --font-name. "
@@ -207,28 +204,33 @@ int CmdUninstall(int argc, char** argv)
 
 void InitCommands()
 {
-    RegisterCommand("help", "Show this help message",
+    Command helpCmd = {"help", "Show this help message",
         "ohos-fontManager help [command]",
         "    command          Optional. Show detailed help for a specific command.",
         "    ohos-fontManager help\n"
         "    ohos-fontManager help install",
-        CmdHelp);
+        CmdHelp};
+    RegisterCommand("help", helpCmd);
 
-    RegisterCommand("install", "Install a font from a local file into the system font directory",
+    Command installCmd = {"install",
+        "Install a font from a local file into the system font directory",
         "ohos-fontManager install --font-path <path>",
         "    --font-path <path>  Required. Font file path to install "
         "(must exist and be readable, e.g., .ttf or .otf)",
         "    # Install a font from local file\n"
         "    ohos-fontManager install --font-path /data/local/tmp/custom.ttf",
-        CmdInstall);
+        CmdInstall};
+    RegisterCommand("install", installCmd);
 
-    RegisterCommand("uninstall", "Uninstall an installed font by name from the system",
+    Command uninstallCmd = {"uninstall",
+        "Uninstall an installed font by name from the system",
         "ohos-fontManager uninstall --font-name <name>",
         "    --font-name <name>  Required. Font name to uninstall "
         "(the installed font name, not a file path)",
         "    # Uninstall a font by name\n"
         "    ohos-fontManager uninstall --font-name CustomFont",
-        CmdUninstall);
+        CmdUninstall};
+    RegisterCommand("uninstall", uninstallCmd);
 }
 
 int main(int argc, char** argv)
