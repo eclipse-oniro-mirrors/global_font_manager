@@ -12,36 +12,43 @@
 # limitations under the License.
 
 import("//build/test.gni")
+import("//base/global/font_manager/font_manager.gni")
 
 module_output_path = "font_manager/tools"
 
-ohos_unittest("ohos_font_manager_cli_test") {
-  module_out_path = module_output_path
+if (font_manager_feature_cli) {
+  ohos_unittest("ohos_font_manager_cli_test") {
+    module_out_path = module_output_path
 
-  sources = [
-    "utils_test.cpp",
-    "font_error_test.cpp",
-    "param_parser_test.cpp",
-    "../src/utils.cpp",
-    "../src/font_error.cpp",
-    "../src/param_parser.cpp",
-  ]
+    sources = [
+      "utils_test.cpp",
+      "font_error_test.cpp",
+      "param_parser_test.cpp",
+      "../src/utils.cpp",
+      "../src/font_error.cpp",
+      "../src/param_parser.cpp",
+    ]
 
-  include_dirs = [
-    "../src",
-  ]
+    include_dirs = [
+      "../src",
+    ]
 
-  external_deps = [
-    "cJSON:cjson",
-    "hilog:libhilog",
-    "googletest:gtest_main",
-  ]
+    external_deps = [
+      "cJSON:cjson",
+      "hilog:libhilog",
+      "googletest:gtest_main",
+    ]
 
-  subsystem_name = "global"
-  part_name = "font_manager"
-}
+    subsystem_name = "global"
+    part_name = "font_manager"
+  }
 
-group("unittest") {
-  testonly = true
-  deps = [ ":ohos_font_manager_cli_test" ]
+  group("unittest") {
+    testonly = true
+    deps = [ ":ohos_font_manager_cli_test" ]
+  }
+} else {
+  group("unittest") {
+    testonly = true
+  }
 }
