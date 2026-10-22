@@ -1,0 +1,87 @@
+{
+  "name": "ohos-fontManager",
+  "version": "1.0.0",
+  "description": "Font management CLI tool for installing and uninstalling system fonts. Used for system font lifecycle management in device administration scenarios. Does not support data migration, scope font management, or font observer registration.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-fontManager",
+  "requirePermissions": [
+    "ohos.permission.UPDATE_FONT"
+  ],
+  "isLockScreenExecutionAllowed": false,
+  "hasSubCommand": true,
+  "subcommands": {
+    "install": {
+      "description": "Install a font file from a local path into the system font directory. Used for adding custom fonts to the system. Does not support installing fonts for specific users or application-level scope fonts.",
+      "requirePermissions": [
+        "ohos.permission.UPDATE_FONT"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "font-path": {
+            "type": "string",
+            "description": "Absolute or relative path to the font file to install. Used for specifying the source font file during installation. Must be a readable file in a valid font format such as .ttf or .otf; does not accept directory paths or non-font file types.",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "font-path"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Human-readable result message indicating whether the font installation succeeded. Used for conveying operation outcome to the caller. Returns a success confirmation or a description of what occurred during installation."
+          },
+          "fontPath": {
+            "type": "string",
+            "description": "The font file path that was submitted for installation. Used for echoing back the input parameter in the result. Does not reflect the final installed font location in the system font directory."
+          }
+        }
+      }
+    },
+    "uninstall": {
+      "description": "Uninstall an installed font by its name from the system. Used for removing custom fonts from the system. Does not support uninstalling fonts for specific users or application-level scope fonts.",
+      "requirePermissions": [
+        "ohos.permission.UPDATE_FONT"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "font-name": {
+            "type": "string",
+            "description": "Name of the installed font to uninstall. Used for identifying which font to remove from the system. Must match the font name registered during installation; does not accept file paths or partial name matches.",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "font-name"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Human-readable result message indicating whether the font uninstallation succeeded. Used for conveying operation outcome to the caller. Returns a success confirmation or a description of what occurred during uninstallation."
+          },
+          "fontName": {
+            "type": "string",
+            "description": "The font name that was submitted for uninstallation. Used for echoing back the input parameter in the result. Reflects the font name identifier, not a file path."
+          }
+        }
+      }
+    }
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {}
+  }
+}
