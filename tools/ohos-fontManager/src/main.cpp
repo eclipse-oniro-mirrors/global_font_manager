@@ -38,7 +38,6 @@ constexpr size_t MAX_FONT_NAME_LEN = 256;
 const int ARG_INDEX_SUB_COMMAND = 1;
 const int ARG_COUNT_WITH_SUB_COMMAND = 2;
 const int ARG_SKIP_COUNT = 2;
-const int EXIT_FAILURE_CODE = 1;
 }  // namespace
 
 typedef std::function<int(int, char**)> CommandHandler;
