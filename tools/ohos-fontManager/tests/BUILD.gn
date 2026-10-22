@@ -14,9 +14,9 @@
 import("//build/test.gni")
 import("//base/global/font_manager/font_manager.gni")
 
-module_output_path = "font_manager/tools"
-
 if (font_manager_feature_cli) {
+  module_output_path = "font_manager/tools"
+
   ohos_unittest("ohos_font_manager_cli_test") {
     module_out_path = module_output_path
 
