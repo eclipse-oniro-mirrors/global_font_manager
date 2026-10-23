@@ -53,6 +53,7 @@ if (font_manager_feature_cli) {
     ]
 
     external_deps = [
+      "bounds_checking_function:libsec_shared",
       "cJSON:cjson",
       "hilog:libhilog",
     ]
