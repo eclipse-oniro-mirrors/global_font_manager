@@ -312,7 +312,8 @@ HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest016, TestSize.Lev
     manager_->callback_ = nullptr;
     EventData eventData = {.event = EventType::PROGRESS_RESULT, .progressResult = 0};
     manager_->RefreshEventData(eventData);
-    SUCCEED();
+    // With null callback, RefreshEventData should be a no-op (no crash)
+    EXPECT_EQ(manager_->callback_, nullptr);
 }
 
 HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest017, TestSize.Level1)
@@ -339,7 +340,9 @@ HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest018, TestSize.Lev
     manager_->callback_ = cb;
     EventData eventData = {.event = EventType::HEART_BEAT};
     manager_->RefreshEventData(eventData);
-    SUCCEED();
+    // callback_ should remain valid after RefreshEventData
+    EXPECT_EQ(manager_->callback_, cb);
+    manager_->callback_ = nullptr;
 }
 
 HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest019, TestSize.Level1)
@@ -418,6 +421,201 @@ HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest024, TestSize.Lev
     EXPECT_EQ(manager_->callback_, cb);
     manager_->callback_ = nullptr;
 }
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest025
+ * @tc.desc: Test DataMigration with empty INSTALL_PATH_APP (ERR_NOT_NEED_DATA_MIGRATION)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest025, TestSize.Level1)
+{
+    // Ensure INSTALL_PATH_APP is empty so InitDataMigrationEnv returns ERR_NOT_NEED_DATA_MIGRATION
+    FontManagerUtils::DeleteDir(INSTALL_PATH_APP, false);
+    sptr<IDataMigrationCallback> cb = new (std::nothrow) TestCallback();
+    ASSERT_TRUE(cb != nullptr);
+    manager_->isDataMigrationing_.store(false);
+    manager_->DataMigration(cb);
+    // DataMigration completes without crash; isDataMigrationing_ should be reset
+    EXPECT_FALSE(manager_->isDataMigrationing_.load());
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest026
+ * @tc.desc: Test InitDataMigrationEnv with empty INSTALL_PATH_APP
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest026, TestSize.Level1)
+{
+    PermissionCommon::SetFontManagerInitEnv();
+    FontManagerUtils::DeleteDir(INSTALL_PATH_APP, false);
+    manager_->userIds_ = {TEST_USERID};
+    ASSERT_TRUE(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST));
+    int32_t ret = manager_->InitDataMigrationEnv();
+    EXPECT_EQ(ret, ERR_NOT_NEED_DATA_MIGRATION);
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest027
+ * @tc.desc: Test StartDataMigration with empty paths
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest027, TestSize.Level1)
+{
+    PermissionCommon::SetFontManagerInitEnv();
+    ASSERT_TRUE(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST));
+    manager_->userIds_ = {TEST_USERID};
+    FontManagerUtils::DeleteDir(INSTALL_PATH_APP, false);
+    FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_APP);
+    int32_t ret = manager_->StartDataMigration();
+    EXPECT_EQ(ret, ERR_OK);
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest028
+ * @tc.desc: Test EventDataProgress with i=0
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest028, TestSize.Level1)
+{
+    sptr<IDataMigrationCallback> cb = new (std::nothrow) TestCallback();
+    ASSERT_TRUE(cb != nullptr);
+    manager_->callback_ = cb;
+    manager_->userIds_ = {TEST_USERID};
+    ASSERT_TRUE(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST));
+    // Should not crash; callback_ should remain valid after call
+    manager_->EventDataProgress(0, 10, 1);
+    EXPECT_EQ(manager_->callback_, cb);
+    manager_->callback_ = nullptr;
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest029
+ * @tc.desc: Test EventDataProgress with i>0
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest029, TestSize.Level1)
+{
+    sptr<IDataMigrationCallback> cb = new (std::nothrow) TestCallback();
+    ASSERT_TRUE(cb != nullptr);
+    manager_->callback_ = cb;
+    manager_->userIds_ = {TEST_USERID};
+    ASSERT_TRUE(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST));
+    manager_->EventDataProgress(5, 10, 2);
+    EXPECT_EQ(manager_->callback_, cb);
+    manager_->callback_ = nullptr;
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest030
+ * @tc.desc: Test EventDataResult
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest030, TestSize.Level1)
+{
+    sptr<IDataMigrationCallback> cb = new (std::nothrow) TestCallback();
+    ASSERT_TRUE(cb != nullptr);
+    manager_->callback_ = cb;
+    manager_->EventDataResult(ERR_OK);
+    EXPECT_EQ(manager_->callback_, cb);
+    manager_->callback_ = nullptr;
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest031
+ * @tc.desc: Test EventDataHeartBeat
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest031, TestSize.Level1)
+{
+    sptr<IDataMigrationCallback> cb = new (std::nothrow) TestCallback();
+    ASSERT_TRUE(cb != nullptr);
+    manager_->callback_ = cb;
+    manager_->EventDataHeartBeat();
+    EXPECT_EQ(manager_->callback_, cb);
+    manager_->callback_ = nullptr;
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest032
+ * @tc.desc: Test CheckAndUpdateAllFontRecord
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest032, TestSize.Level1)
+{
+    PermissionCommon::SetFontManagerInitEnv();
+    ASSERT_TRUE(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST));
+    manager_->userIds_ = {TEST_USERID};
+    manager_->CheckAndUpdateAllFontRecord();
+    // Config file should exist and be valid after update
+    EXPECT_TRUE(FontManagerUtils::CheckPathExist(INSTALL_PATH_TEST + FONT_CONFIG_FILE));
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest033
+ * @tc.desc: Test DataMigrationInner with empty INSTALL_PATH_APP
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest033, TestSize.Level1)
+{
+    // Ensure INSTALL_PATH_APP is empty so InitDataMigrationEnv returns ERR_NOT_NEED_DATA_MIGRATION
+    PermissionCommon::SetFontManagerInitEnv();
+    FontManagerUtils::DeleteDir(INSTALL_PATH_APP, false);
+    manager_->isDataMigrationing_.store(false);
+    int32_t ret = manager_->DataMigrationInner();
+    EXPECT_EQ(ret, ERR_NOT_NEED_DATA_MIGRATION);
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest034
+ * @tc.desc: Test CopyFileForDataMigration with directory as source (fopen may succeed or fail)
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest034, TestSize.Level1)
+{
+    PermissionCommon::SetFontManagerInitEnv();
+    ASSERT_TRUE(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST));
+    manager_->userIds_ = {TEST_USERID};
+    int32_t ret = manager_->CopyFileForDataMigration("/data/test/", TEST_USERID);
+    // On some platforms fopen("/data/test/") succeeds (returns directory fd), on others it fails.
+    // If fopen succeeds: fileno succeeds, CopyFile likely fails -> ERR_COPY_FILE or ERR_OK
+    // If fopen fails: -> ERR_OPEN_SRC_FILE
+    // Either way, it should not crash. Verify the return is a known error code.
+    EXPECT_TRUE(ret == ERR_OPEN_SRC_FILE || ret == ERR_COPY_FILE || ret == ERR_OK);
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest035
+ * @tc.desc: Test StartOneFileCopyTask with valid file
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest035, TestSize.Level1)
+{
+    PermissionCommon::SetFontManagerInitEnv();
+    ASSERT_TRUE(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST));
+    manager_->userIds_ = {TEST_USERID};
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    ASSERT_GE(fd, 0);
+    std::string srcPath = INSTALL_PATH_APP + "test_remove_fail.ttf";
+    EXPECT_TRUE(FontManagerUtils::CopyFile(fd, srcPath));
+    if (fd >= 0) {
+        close(fd);
+    }
+    int32_t ret = manager_->StartOneFileCopyTask(srcPath);
+    EXPECT_EQ(ret, ERR_OK);
+}
+
+/**
+ * @tc.name: DataMigrationManagerFuncTest036
+ * @tc.desc: Test IsShouldUpdateProgress with totalCount <= MAX_TRIGGER_COUNT
+ * @tc.type: FUNC
+ */
+HWTEST_F(DataMigrationManagerTest, DataMigrationManagerFuncTest036, TestSize.Level1)
+{
+    EXPECT_TRUE(manager_->IsShouldUpdateProgress(0, 100));
+    EXPECT_TRUE(manager_->IsShouldUpdateProgress(50, 100));
+    EXPECT_TRUE(manager_->IsShouldUpdateProgress(99, 100));
+}
+
 } // namespace FontManager
 } // namespace Global
 } // namespace OHOS

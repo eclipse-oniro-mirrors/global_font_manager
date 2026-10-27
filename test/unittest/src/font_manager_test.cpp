@@ -804,11 +804,10 @@ HWTEST_F(FontManagerTest, FontManagerFuncTest036, TestSize.Level1)
 {
     ASSERT_EQ(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST), true);
     int fd = open("/data/test/nonexistent_12345.ttf", O_RDONLY);
-    if (fd < 0) {
-        std::string fileName = "TestFont_Sans.ttf";
-        std::string destPath = manager_->CopyFileForInstall(INSTALL_PATH_TEST, fileName, fd);
-        EXPECT_TRUE(destPath.empty());
-    }
+    ASSERT_LT(fd, 0);
+    std::string fileName = "TestFont_Sans.ttf";
+    std::string destPath = manager_->CopyFileForInstall(INSTALL_PATH_TEST, fileName, fd);
+    EXPECT_TRUE(destPath.empty());
 }
 
 HWTEST_F(FontManagerTest, FontManagerFuncTest037, TestSize.Level1)
@@ -997,6 +996,11 @@ HWTEST_F(FontManagerTest, FontManagerFuncTest045, TestSize.Level1)
 {
     int ret = manager_->GetFontScope("file://test/not_installed.ttf", "com.example.app",
         TEST_TOKEN_ID, TEST_USERID);
+    EXPECT_EQ(ret, ERR_SCOPE_FONT_NOT_FOUND);
+    // Empty srcPath should also return ERR_SCOPE_FONT_NOT_FOUND
+    ret = manager_->GetFontScope("", "com.example.app", TEST_TOKEN_ID, TEST_USERID);
+    EXPECT_EQ(ret, ERR_SCOPE_FONT_NOT_FOUND);
+    ret = manager_->GetFontScope("", "", TEST_TOKEN_ID, TEST_USERID);
     EXPECT_EQ(ret, ERR_SCOPE_FONT_NOT_FOUND);
 }
 
@@ -1508,6 +1512,355 @@ HWTEST_F(FontManagerTest, FontManagerFuncTest067, TestSize.Level1)
     ret = manager_->GetFontScope("file://test/clone_uninstall.ttf", "com.example.app",
         TEST_TOKEN_ID, TEST_USERID);
     EXPECT_EQ(ret, FONT_SCOPE_APP);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest068
+ * @tc.desc: Test UninstallFont with scope font name returns ERR_UNINSTALL_FILE_NOT_EXISTS
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest068, TestSize.Level1)
+{
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info;
+    info.fd = fd;
+    info.scope = FONT_SCOPE_APP;
+    info.srcPath = "file://test/scope_uninstall_via_user.ttf";
+    info.bundleName = "com.example.app";
+    info.appIdentifier = "app_5001";
+    info.userId = TEST_USERID;
+    EXPECT_EQ(manager_->InstallScopeFont(info), ERR_OK);
+    if (fd >= 0) {
+        close(fd);
+    }
+    // UninstallFont with the scope font's full name should fail (scope >= 0)
+    int32_t ret = manager_->UninstallFont(FONT_FULL_NAME, TEST_USERID);
+    EXPECT_EQ(ret, ERR_UNINSTALL_FILE_NOT_EXISTS);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest069
+ * @tc.desc: Test UninstallScopeFont with file not on disk
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest069, TestSize.Level1)
+{
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info;
+    info.fd = fd;
+    info.scope = FONT_SCOPE_APP;
+    info.srcPath = "file://test/uninstall_no_file.ttf";
+    info.bundleName = "com.example.app";
+    info.appIdentifier = "app_5001";
+    info.userId = TEST_USERID;
+    EXPECT_EQ(manager_->InstallScopeFont(info), ERR_OK);
+    if (fd >= 0) {
+        close(fd);
+    }
+    // Remove the font file from disk but keep config record
+    auto& fontConfig = manager_->SafeGetOrCreateConfig(TEST_USERID,
+        INSTALL_PATH_TEST + FONT_CONFIG_FILE);
+    auto record = fontConfig.GetFontRecordByUrl("file://test/uninstall_no_file.ttf");
+    ASSERT_TRUE(record.has_value());
+    std::string realPath = INSTALL_PATH_TEST + "app_5001/" + FontManagerUtils::GetFileName(record->fontPath);
+    FontManagerUtils::RemoveFile(realPath);
+    // Uninstall should still succeed (file not on disk, but record exists)
+    int32_t ret = manager_->UninstallScopeFont("file://test/uninstall_no_file.ttf",
+        "com.example.app", TEST_TOKEN_ID, TEST_USERID);
+    EXPECT_EQ(ret, ERR_OK);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest070
+ * @tc.desc: Test GetAppInstallPath returns correct path
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest070, TestSize.Level1)
+{
+    std::string result = manager_->GetAppInstallPath(TEST_USERID, "app_5001");
+    std::string expected = INSTALL_PATH_PREFIX + std::to_string(TEST_USERID) + INSTALL_PATH_SUFFIX + "app_5001/";
+    EXPECT_EQ(result, expected);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest071
+ * @tc.desc: Test CleanupAppScopeFonts with multiple records
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest071, TestSize.Level1)
+{
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info1;
+    info1.fd = fd;
+    info1.scope = FONT_SCOPE_APP;
+    info1.srcPath = "file://test/cleanup_multi_1.ttf";
+    info1.bundleName = "com.example.multi";
+    info1.appIdentifier = "app_multi";
+    info1.userId = TEST_USERID;
+    EXPECT_EQ(manager_->InstallScopeFont(info1), ERR_OK);
+    if (fd >= 0) {
+        close(fd);
+    }
+    fd = open(TTC_FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info2;
+    info2.fd = fd;
+    info2.scope = FONT_SCOPE_APP;
+    info2.srcPath = "file://test/cleanup_multi_2.ttf";
+    info2.bundleName = "com.example.multi";
+    info2.appIdentifier = "app_multi";
+    info2.userId = TEST_USERID;
+    EXPECT_EQ(manager_->InstallScopeFont(info2), ERR_OK);
+    if (fd >= 0) {
+        close(fd);
+    }
+    EXPECT_EQ(manager_->CleanupAppScopeFonts("app_multi", TEST_USERID), ERR_OK);
+    EXPECT_EQ(manager_->GetFontScope("file://test/cleanup_multi_1.ttf",
+        "com.example.multi", TEST_TOKEN_ID, TEST_USERID), ERR_SCOPE_FONT_NOT_FOUND);
+    EXPECT_EQ(manager_->GetFontScope("file://test/cleanup_multi_2.ttf",
+        "com.example.multi", TEST_TOKEN_ID, TEST_USERID), ERR_SCOPE_FONT_NOT_FOUND);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest072
+ * @tc.desc: Test InstallScopeFont with CheckAndUpdateFontRecord fail (corrupt config)
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest072, TestSize.Level1)
+{
+    FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST);
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, "{corrupt json");
+    manager_->configMap_.clear();
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info;
+    info.fd = fd;
+    info.scope = FONT_SCOPE_APP;
+    info.srcPath = "file://test/corrupt_config.ttf";
+    info.bundleName = "com.example.app";
+    info.appIdentifier = "app_5001";
+    info.userId = TEST_USERID;
+    int32_t ret = manager_->InstallScopeFont(info);
+    if (fd >= 0) {
+        close(fd);
+    }
+    EXPECT_EQ(ret, ERR_SYSTEM_ERROR);
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest073
+ * @tc.desc: Test ValidateAndResolveRealPath rejects path with backslash
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest073, TestSize.Level1)
+{
+    std::string installPath = INSTALL_PATH_PREFIX + std::to_string(TEST_USERID) + INSTALL_PATH_SUFFIX;
+    std::string path = std::string(INSTALL_PATH_APP) + "font\\name.ttf";
+    std::string result = manager_->ValidateAndResolveRealPath(installPath, path);
+    EXPECT_TRUE(result.empty());
+}
+
+/**
+ * @tc.name: FontManagerFuncTest074
+ * @tc.desc: Test InstallScopeFont with session scope and GetFontScope returns session
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest074, TestSize.Level1)
+{
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info;
+    info.fd = fd;
+    info.scope = FONT_SCOPE_SESSION;
+    info.srcPath = "file://test/session_scope_query.ttf";
+    info.bundleName = "com.example.session";
+    info.appIdentifier = "session_5001";
+    info.userId = TEST_USERID;
+    EXPECT_EQ(manager_->InstallScopeFont(info), ERR_OK);
+    if (fd >= 0) {
+        close(fd);
+    }
+    EXPECT_EQ(manager_->GetFontScope("file://test/session_scope_query.ttf",
+        "com.example.session", TEST_TOKEN_ID, TEST_USERID), FONT_SCOPE_SESSION);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest076
+ * @tc.desc: Test CopyFileForInstall with invalid fd
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest076, TestSize.Level1)
+{
+    FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST);
+    std::string destPath = manager_->CopyFileForInstall(INSTALL_PATH_TEST, "bad.ttf", -1);
+    EXPECT_TRUE(destPath.empty());
+}
+
+/**
+ * @tc.name: FontManagerFuncTest077
+ * @tc.desc: Test GetMaxInstallNum returns valid value
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest077, TestSize.Level1)
+{
+    int32_t maxNum = manager_->GetMaxInstallNum();
+    EXPECT_GE(maxNum, DEFAULT_MAX_INSTALL_NUM);
+    // Verify maxNum is a reasonable value (not excessively large)
+    EXPECT_LE(maxNum, 10000);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest078
+ * @tc.desc: Test CleanupScopeFontsByUser with records present
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest078, TestSize.Level1)
+{
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info;
+    info.fd = fd;
+    info.scope = FONT_SCOPE_APP;
+    info.srcPath = "file://test/cleanup_user_records.ttf";
+    info.bundleName = "com.example.app";
+    info.appIdentifier = "app_5001";
+    info.userId = TEST_USERID;
+    EXPECT_EQ(manager_->InstallScopeFont(info), ERR_OK);
+    if (fd >= 0) {
+        close(fd);
+    }
+    EXPECT_EQ(manager_->CleanupScopeFontsByUser(TEST_USERID), ERR_OK);
+    EXPECT_EQ(manager_->GetFontScope("file://test/cleanup_user_records.ttf",
+        "com.example.app", TEST_TOKEN_ID, TEST_USERID), ERR_SCOPE_FONT_NOT_FOUND);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest079
+ * @tc.desc: Test CleanupAppScopeFontsByUser with records present
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest079, TestSize.Level1)
+{
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info;
+    info.fd = fd;
+    info.scope = FONT_SCOPE_APP;
+    info.srcPath = "file://test/cleanup_app_user_records.ttf";
+    info.bundleName = "com.example.app";
+    info.appIdentifier = "app_5001";
+    info.userId = TEST_USERID;
+    EXPECT_EQ(manager_->InstallScopeFont(info), ERR_OK);
+    if (fd >= 0) {
+        close(fd);
+    }
+    EXPECT_EQ(manager_->CleanupAppScopeFontsByUser(TEST_USERID), ERR_OK);
+    EXPECT_EQ(manager_->GetFontScope("file://test/cleanup_app_user_records.ttf",
+        "com.example.app", TEST_TOKEN_ID, TEST_USERID), ERR_SCOPE_FONT_NOT_FOUND);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest080
+ * @tc.desc: Test InstallFont with corrupt config returns ERR_INSTALL_FAIL
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest080, TestSize.Level1)
+{
+    FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST);
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, "not_valid_json");
+    manager_->configMap_.clear();
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    ASSERT_GE(fd, 0);
+    int32_t ret = manager_->InstallFont(fd, TEST_USERID);
+    if (fd >= 0) {
+        close(fd);
+    }
+    EXPECT_EQ(ret, ERR_INSTALL_FAIL);
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest081
+ * @tc.desc: Test InstallScopeFont with session scope and uninstall
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest081, TestSize.Level1)
+{
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info;
+    info.fd = fd;
+    info.scope = FONT_SCOPE_SESSION;
+    info.srcPath = "file://test/session_uninstall.ttf";
+    info.bundleName = "com.example.session";
+    info.appIdentifier = "session_5001";
+    info.userId = TEST_USERID;
+    EXPECT_EQ(manager_->InstallScopeFont(info), ERR_OK);
+    if (fd >= 0) {
+        close(fd);
+    }
+    EXPECT_EQ(manager_->UninstallScopeFont("file://test/session_uninstall.ttf",
+        "com.example.session", TEST_TOKEN_ID, TEST_USERID), ERR_OK);
+    EXPECT_EQ(manager_->GetFontScope("file://test/session_uninstall.ttf",
+        "com.example.session", TEST_TOKEN_ID, TEST_USERID), ERR_SCOPE_FONT_NOT_FOUND);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest082
+ * @tc.desc: Test GetFontScope with appIdentifier mismatch (session scope)
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest082, TestSize.Level1)
+{
+    int fd = open(FONT_PATH.c_str(), O_RDONLY);
+    EXPECT_EQ(fd >= 0, true);
+    ScopeFontInstallInfo info;
+    info.fd = fd;
+    info.scope = FONT_SCOPE_SESSION;
+    info.srcPath = "file://test/session_mismatch.ttf";
+    info.bundleName = "com.example.session";
+    info.appIdentifier = "session_5001";
+    info.userId = TEST_USERID;
+    EXPECT_EQ(manager_->InstallScopeFont(info), ERR_OK);
+    if (fd >= 0) {
+        close(fd);
+    }
+    // Query with correct bundleName but different tokenId -> appIdentifier mismatch
+    int32_t ret = manager_->GetFontScope("file://test/session_mismatch.ttf",
+        "com.example.session", TEST_TOKEN_ID_CLONE, TEST_USERID);
+    EXPECT_EQ(ret, ERR_SCOPE_FONT_NOT_FOUND);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest083
+ * @tc.desc: Test UninstallFont with font name found but path empty in config
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest083, TestSize.Level1)
+{
+    std::string configWithEmptyPath = R"({"fontlist": [{"fontfullpath": "", "fullname": [")" +
+        FONT_FULL_NAME + R"("]}], "version": 1})";
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, configWithEmptyPath);
+    manager_->configMap_.clear();
+    int32_t ret = manager_->UninstallFont(FONT_FULL_NAME, TEST_USERID);
+    EXPECT_EQ(ret, ERR_UNINSTALL_FILE_NOT_EXISTS);
+}
+
+/**
+ * @tc.name: FontManagerFuncTest084
+ * @tc.desc: Test SandBoxPathToRealPath with non-INSTALL_PATH_APP path
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerTest, FontManagerFuncTest084, TestSize.Level1)
+{
+    std::string installPath = INSTALL_PATH_PREFIX + std::to_string(TEST_USERID) + INSTALL_PATH_SUFFIX;
+    std::string path = "/some/other/path/font.ttf";
+    std::string result = manager_->SandBoxPathToRealPath(installPath, path);
+    EXPECT_EQ(result, installPath + "font.ttf");
 }
 } // namespace FontManager
 } // namespace Global

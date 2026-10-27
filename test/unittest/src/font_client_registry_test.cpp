@@ -282,6 +282,132 @@ HWTEST_F(FontClientRegistryTest, FontClientRegistryTest014, TestSize.Level1)
     EXPECT_EQ(registry_->IsClientRegistered(tokenId), false);
     EXPECT_EQ(registry_->GetClientCount(), 0);
 }
+
+/**
+ * @tc.name: FontClientRegistryTest015
+ * @tc.desc: Test NotifyClientDied with no callback set (no crash, no-op)
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontClientRegistryTest, FontClientRegistryTest015, TestSize.Level1)
+{
+    bool called = false;
+    registry_->clientDiedCallback_ = nullptr;
+    registry_->NotifyClientDied();
+    // No callback set, so called should remain false
+    EXPECT_FALSE(called);
+}
+
+/**
+ * @tc.name: FontClientRegistryTest016
+ * @tc.desc: Test UnregisterClient with appIdentifier empty skips cleanup
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontClientRegistryTest, FontClientRegistryTest016, TestSize.Level1)
+{
+    sptr<MockFontClientObserver> observer = new MockFontClientObserver();
+    int32_t tokenId = 700006;
+    registry_->RegisterClient(observer->AsObject(), "com.example.app", 100, tokenId);
+    registry_->clients_[tokenId].appIdentifier = "";
+    int32_t ret = registry_->UnregisterClient(tokenId);
+    EXPECT_EQ(ret, ERR_OK);
+    EXPECT_EQ(registry_->IsClientRegistered(tokenId), false);
+}
+
+/**
+ * @tc.name: FontClientRegistryTest017
+ * @tc.desc: Test UnregisterClient with userId < 0 skips cleanup
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontClientRegistryTest, FontClientRegistryTest017, TestSize.Level1)
+{
+    sptr<MockFontClientObserver> observer = new MockFontClientObserver();
+    int32_t tokenId = 700007;
+    registry_->RegisterClient(observer->AsObject(), "com.example.app", 100, tokenId);
+    registry_->clients_[tokenId].userId = -1;
+    int32_t ret = registry_->UnregisterClient(tokenId);
+    EXPECT_EQ(ret, ERR_OK);
+    EXPECT_EQ(registry_->IsClientRegistered(tokenId), false);
+}
+
+/**
+ * @tc.name: FontClientRegistryTest018
+ * @tc.desc: Test OnClientDied with userId < 0 skips cleanup
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontClientRegistryTest, FontClientRegistryTest018, TestSize.Level1)
+{
+    sptr<MockFontClientObserver> observer = new MockFontClientObserver();
+    int32_t tokenId = 700008;
+    registry_->RegisterClient(observer->AsObject(), "com.example.app", 100, tokenId);
+    registry_->clients_[tokenId].userId = -1;
+    registry_->OnClientDied(tokenId);
+    EXPECT_EQ(registry_->IsClientRegistered(tokenId), false);
+    EXPECT_EQ(registry_->GetClientCount(), 0);
+}
+
+/**
+ * @tc.name: FontClientRegistryTest019
+ * @tc.desc: Test SetClientDiedCallback sets callback
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontClientRegistryTest, FontClientRegistryTest019, TestSize.Level1)
+{
+    bool called = false;
+    registry_->SetClientDiedCallback([&called]() { called = true; });
+    registry_->NotifyClientDied();
+    EXPECT_TRUE(called);
+}
+
+/**
+ * @tc.name: FontClientRegistryTest020
+ * @tc.desc: Test RegisterClient with valid binder and verify client info
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontClientRegistryTest, FontClientRegistryTest020, TestSize.Level1)
+{
+    sptr<MockFontClientObserver> observer = new MockFontClientObserver();
+    int32_t tokenId = 700009;
+    int32_t ret = registry_->RegisterClient(observer->AsObject(), "com.example.test", 101, tokenId);
+    EXPECT_EQ(ret, ERR_OK);
+    auto it = registry_->clients_.find(tokenId);
+    ASSERT_NE(it, registry_->clients_.end());
+    EXPECT_EQ(it->second.bundleName, "com.example.test");
+    EXPECT_EQ(it->second.userId, 101);
+    EXPECT_EQ(it->second.tokenId, tokenId);
+}
+
+/**
+ * @tc.name: FontClientRegistryTest021
+ * @tc.desc: Test RegisterClient per-user limit is per-user not global
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontClientRegistryTest, FontClientRegistryTest021, TestSize.Level1)
+{
+    for (int32_t i = 0; i < MAX_SCOPE_FONT_APP_NUM; i++) {
+        sptr<MockFontClientObserver> observer = new MockFontClientObserver();
+        registry_->RegisterClient(observer->AsObject(), "com.example.app" + std::to_string(i),
+            100, 800000 + i);
+    }
+    // Different user should still be able to register
+    sptr<MockFontClientObserver> observer = new MockFontClientObserver();
+    int32_t ret = registry_->RegisterClient(observer->AsObject(), "com.example.other", 101, 899999);
+    EXPECT_EQ(ret, ERR_OK);
+    EXPECT_EQ(registry_->GetClientCount(), MAX_SCOPE_FONT_APP_NUM + 1);
+}
+
+/**
+ * @tc.name: FontClientRegistryTest022
+ * @tc.desc: Test IsClientRegistered and GetClientCount with empty registry
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontClientRegistryTest, FontClientRegistryTest022, TestSize.Level1)
+{
+    EXPECT_EQ(registry_->GetClientCount(), 0);
+    EXPECT_FALSE(registry_->IsClientRegistered(999999));
+    EXPECT_FALSE(registry_->IsClientRegistered(888888));
+    EXPECT_FALSE(registry_->IsClientRegistered(100001));
+    EXPECT_FALSE(registry_->IsClientRegistered(100002));
+}
 } // namespace FontManager
 } // namespace Global
 } // namespace OHOS

@@ -131,6 +131,8 @@ HWTEST_F(StorageManagerAdapterTest, StorageManagerAdapterFuncTest005, TestSize.L
 {
     uint64_t size = adapter_->GetFontFolderSize("/data/service/el1/999/for-all-app/fonts/");
     EXPECT_EQ(size, 0);
+    uint64_t size2 = adapter_->GetFontFolderSize("/data/test/nonexistent_dir_12345/");
+    EXPECT_EQ(size2, 0);
 }
 
 /**
@@ -158,6 +160,65 @@ HWTEST_F(StorageManagerAdapterTest, StorageManagerAdapterFuncTest006, TestSize.L
         EXPECT_EQ(ret, 13600001);
     }
 }
+
+/**
+ * @tc.name: StorageManagerAdapterFuncTest007
+ * @tc.desc: Test GetFontInstallerBusinessName consistency with ReportFontBundleStats
+ * @tc.type: FUNC
+ */
+HWTEST_F(StorageManagerAdapterTest, StorageManagerAdapterFuncTest007, TestSize.Level1)
+{
+    std::string businessName = adapter_->GetFontInstallerBusinessName();
+    // businessName comes from system parameter const.fontmanager.extstoragebundle.
+    // Value varies by device configuration. Verify consistency: when businessName is empty,
+    // ReportFontBundleStats must return ERR_INVALID_PARAM; when non-empty, it must not.
+    int32_t ret = adapter_->ReportFontBundleStats(TEST_USERID, INSTALL_PATH_TEST);
+    if (businessName.empty()) {
+        EXPECT_EQ(ret, ERR_INVALID_PARAM);
+    } else {
+        EXPECT_NE(ret, ERR_INVALID_PARAM);
+    }
+}
+
+/**
+ * @tc.name: StorageManagerAdapterFuncTest008
+ * @tc.desc: Test GetStorageManagerProxy consistency with ReportFontBundleStats
+ * @tc.type: FUNC
+ */
+HWTEST_F(StorageManagerAdapterTest, StorageManagerAdapterFuncTest008, TestSize.Level1)
+{
+    auto proxy = adapter_->GetStorageManagerProxy();
+    std::string businessName = adapter_->GetFontInstallerBusinessName();
+    int32_t ret = adapter_->ReportFontBundleStats(TEST_USERID, INSTALL_PATH_TEST);
+    // Verify consistency between proxy availability, businessName, and result
+    if (businessName.empty()) {
+        EXPECT_EQ(ret, ERR_INVALID_PARAM);
+    } else if (proxy == nullptr) {
+        EXPECT_EQ(ret, ERR_SYSTEM_ERROR);
+    } else {
+        EXPECT_NE(ret, ERR_INVALID_PARAM);
+        EXPECT_NE(ret, ERR_SYSTEM_ERROR);
+    }
+}
+
+/**
+ * @tc.name: StorageManagerAdapterFuncTest009
+ * @tc.desc: Test ReportFontBundleStats with empty install path
+ * @tc.type: FUNC
+ */
+HWTEST_F(StorageManagerAdapterTest, StorageManagerAdapterFuncTest009, TestSize.Level1)
+{
+    std::string businessName = adapter_->GetFontInstallerBusinessName();
+    int32_t ret = adapter_->ReportFontBundleStats(TEST_USERID, "");
+    // businessName varies by device. When empty, ReportFontBundleStats returns ERR_INVALID_PARAM.
+    // When non-empty, it proceeds to proxy/IPC path (ret depends on SA availability).
+    if (businessName.empty()) {
+        EXPECT_EQ(ret, ERR_INVALID_PARAM);
+    } else {
+        EXPECT_NE(ret, ERR_INVALID_PARAM);
+    }
+}
+
 } // namespace FontManager
 } // namespace Global
 } // namespace OHOS

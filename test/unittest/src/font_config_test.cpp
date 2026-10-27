@@ -922,7 +922,12 @@ HWTEST_F(FontConfigTest, FontConfigFuncTest049, TestSize.Level1)
 HWTEST_F(FontConfigTest, FontConfigFuncTest050, TestSize.Level1)
 {
     ASSERT_EQ(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST), true);
+    // Config exists, record not found -> false
     EXPECT_FALSE(this->config_.DeleteScopeFontRecordByUrl("file://test/nonexistent.ttf"));
+    // Config missing -> false
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+    EXPECT_FALSE(FontManagerUtils::CheckPathExist(FONT_CONFIG_FILE_TEST));
+    EXPECT_FALSE(this->config_.DeleteScopeFontRecordByUrl("file://test/another.ttf"));
 }
 
 /**
@@ -933,7 +938,12 @@ HWTEST_F(FontConfigTest, FontConfigFuncTest050, TestSize.Level1)
 HWTEST_F(FontConfigTest, FontConfigFuncTest051, TestSize.Level1)
 {
     ASSERT_EQ(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST), true);
+    // Config exists, app not found -> false
     EXPECT_FALSE(this->config_.DeleteScopeFontRecordByAppId("app_nonexistent"));
+    // Config missing -> false
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+    EXPECT_FALSE(FontManagerUtils::CheckPathExist(FONT_CONFIG_FILE_TEST));
+    EXPECT_FALSE(this->config_.DeleteScopeFontRecordByAppId("app_100"));
 }
 
 /**
@@ -1098,9 +1108,15 @@ HWTEST_F(FontConfigTest, FontConfigFuncTest061, TestSize.Level1)
  */
 HWTEST_F(FontConfigTest, FontConfigFuncTest062, TestSize.Level1)
 {
+    // Missing config file -> ERR_INSTALL_FAIL
     FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
     EXPECT_EQ(this->config_.InsertFontRecordIfUnderLimit(
         "/data/test/font.ttf", {"TestFont"}, 10), ERR_INSTALL_FAIL);
+    // Config in non-existent directory -> ERR_INSTALL_FAIL (WriteToFile fail)
+    FontConfig newConfig("/data/test/nonexistent_dir_12345/config.json");
+    EXPECT_FALSE(FontManagerUtils::CheckPathExist("/data/test/nonexistent_dir_12345/config.json"));
+    EXPECT_EQ(newConfig.InsertFontRecordIfUnderLimit(
+        "/data/test/font2.ttf", {"TestFont2"}, 10), ERR_INSTALL_FAIL);
 }
 
 /**
@@ -1114,6 +1130,374 @@ HWTEST_F(FontConfigTest, FontConfigFuncTest063, TestSize.Level1)
     EXPECT_EQ(this->config_.InsertFontRecordIfUnderLimit(
         "/data/test/font.ttf", {"TestFont"}, 10), ERR_INSTALL_FAIL);
     FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest064
+ * @tc.desc: Test InsertFontRecord with config missing fontlist returns false
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest064, TestSize.Level1)
+{
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, R"({"version":1})");
+    EXPECT_FALSE(this->config_.InsertFontRecord("/data/test/font.ttf", {"TestFont"}));
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest065
+ * @tc.desc: Test InsertFontRecord with existing path returns true (idempotent)
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest065, TestSize.Level1)
+{
+    std::string fontFullPath = INSTALL_PATH_TEST + "Idempotent.ttf";
+    std::vector<std::string> fullName{"IdempotentFont"};
+    ASSERT_TRUE(this->config_.InsertFontRecord(fontFullPath, fullName));
+    EXPECT_TRUE(this->config_.InsertFontRecord(fontFullPath, fullName));
+    EXPECT_EQ(this->config_.GetInstalledFontsNum(), 1);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest068
+ * @tc.desc: Test GetFontRecordByUrl with fontlist not array returns nullopt
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest068, TestSize.Level1)
+{
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, R"({"fontlist":"notarray"})");
+    auto result = this->config_.GetFontRecordByUrl("file://test/font.ttf");
+    EXPECT_FALSE(result.has_value());
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest069
+ * @tc.desc: Test GetFontRecordByName with missing config returns nullopt
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest069, TestSize.Level1)
+{
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+    auto result = this->config_.GetFontRecordByName("TestFont");
+    EXPECT_FALSE(result.has_value());
+}
+
+/**
+ * @tc.name: FontConfigFuncTest070
+ * @tc.desc: Test GetFontRecordsByAppId with missing config returns empty
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest070, TestSize.Level1)
+{
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+    auto result = this->config_.GetFontRecordsByAppId("app_100");
+    EXPECT_EQ(result.size(), 0u);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest071
+ * @tc.desc: Test GetFontRecordsByAppId with fontlist not array returns empty
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest071, TestSize.Level1)
+{
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, R"({"fontlist":"notarray"})");
+    auto result = this->config_.GetFontRecordsByAppId("app_100");
+    EXPECT_EQ(result.size(), 0u);
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest072
+ * @tc.desc: Test GetAppScopeFontRecords with missing config returns empty
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest072, TestSize.Level1)
+{
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+    auto result = this->config_.GetAppScopeFontRecords();
+    EXPECT_EQ(result.size(), 0u);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest073
+ * @tc.desc: Test GetAppScopeFontRecords with fontlist not array returns empty
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest073, TestSize.Level1)
+{
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, R"({"fontlist":"notarray"})");
+    auto result = this->config_.GetAppScopeFontRecords();
+    EXPECT_EQ(result.size(), 0u);
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest074
+ * @tc.desc: Test CheckAndUpdateFontRecord with version as string "7.0" returns true
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest074, TestSize.Level1)
+{
+    std::string v7Json = R"({"fontlist":[],"version":"7.0"})";
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, v7Json);
+    EXPECT_TRUE(this->config_.CheckAndUpdateFontRecord());
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest075
+ * @tc.desc: Test CheckAndUpdateFontRecord with version as non-matching string
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest075, TestSize.Level1)
+{
+    std::string vOther = R"({"fontlist":[],"version":"8.0"})";
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, vOther);
+    EXPECT_TRUE(this->config_.CheckAndUpdateFontRecord());
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest076
+ * @tc.desc: Test DeleteScopeFontRecordByUrl with fontlist not array returns false
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest076, TestSize.Level1)
+{
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, R"({"fontlist":"notarray"})");
+    EXPECT_FALSE(this->config_.DeleteScopeFontRecordByUrl("file://test/font.ttf"));
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest077
+ * @tc.desc: Test DeleteScopeFontRecordByAppId with fontlist not array returns false
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest077, TestSize.Level1)
+{
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, R"({"fontlist":"notarray"})");
+    EXPECT_FALSE(this->config_.DeleteScopeFontRecordByAppId("app_100"));
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest078
+ * @tc.desc: Test GetScopeFontRecords with missing config returns empty
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest078, TestSize.Level1)
+{
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+    auto result = this->config_.GetScopeFontRecords();
+    EXPECT_EQ(result.size(), 0u);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest079
+ * @tc.desc: Test InsertScopeFontRecord with fontlist null returns false
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest079, TestSize.Level1)
+{
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, R"({"version":1})");
+    FontRecordInfo record;
+    record.fontPath = INSTALL_PATH_TEST + "app_100/font.ttf";
+    record.fullNames = {"TestFont"};
+    record.scope = FONT_SCOPE_APP;
+    record.srcPath = "file://test/font.ttf";
+    record.appIdentifier = "app_100";
+    EXPECT_FALSE(this->config_.InsertScopeFontRecord(record));
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest080
+ * @tc.desc: Test ConstructScopeCJSON with minimal record (no scope fields)
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest080, TestSize.Level1)
+{
+    FontRecordInfo record;
+    record.fontPath = INSTALL_PATH_TEST + "minimal.ttf";
+    record.fullNames = {"MinimalFont"};
+    record.scope = -1;  // user-level, no scope field added
+    cJSON *result = this->config_.ConstructScopeCJSON(record);
+    EXPECT_NE(result, nullptr);
+    cJSON_Delete(result);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest081
+ * @tc.desc: Test ConstructScopeCJSON with empty fullNames
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest081, TestSize.Level1)
+{
+    FontRecordInfo record;
+    record.fontPath = INSTALL_PATH_TEST + "empty.ttf";
+    record.fullNames = {};
+    record.scope = FONT_SCOPE_APP;
+    cJSON *result = this->config_.ConstructScopeCJSON(record);
+    EXPECT_NE(result, nullptr);
+    cJSON_Delete(result);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest082
+ * @tc.desc: Test SandBoxPathToRealPath
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest082, TestSize.Level1)
+{
+    ASSERT_EQ(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST), true);
+    std::string path = INSTALL_PATH_TEST + "TestFont.ttf";
+    std::string result = this->config_.SandBoxPathToRealPath(path);
+    EXPECT_FALSE(result.empty());
+}
+
+/**
+ * @tc.name: FontConfigFuncTest083
+ * @tc.desc: Test GetInstalledFontsNum with fontlist not array returns 0
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest083, TestSize.Level1)
+{
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, R"({"fontlist":"notarray"})");
+    EXPECT_EQ(this->config_.GetInstalledFontsNum(), 0);
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest084
+ * @tc.desc: Test GetTotalInstalledFontsNum with fontlist not array returns 0
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest084, TestSize.Level1)
+{
+    FontManagerUtils::CreateFileWithPermission(FONT_CONFIG_FILE_TEST, R"({"fontlist":"notarray"})");
+    EXPECT_EQ(this->config_.GetTotalInstalledFontsNum(), 0);
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest085
+ * @tc.desc: Test GetFileData with valid file
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest085, TestSize.Level1)
+{
+    std::string content = "test content for getfiledata";
+    std::string testPath = INSTALL_PATH_TEST + "getfiledata_test.txt";
+    FontManagerUtils::CreateFileWithPermission(testPath, content);
+    long size = 0;
+    char* data = this->config_.GetFileData(testPath, size);
+    EXPECT_NE(data, nullptr);
+    if (data) {
+        std::string result;
+        result.assign(data, size);
+        EXPECT_EQ(result.substr(0, content.size()), content);
+        free(data);
+    }
+    FontManagerUtils::RemoveFile(testPath);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest086
+ * @tc.desc: Test WriteToFile with valid data
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest086, TestSize.Level1)
+{
+    ASSERT_EQ(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST), true);
+    std::string testData = R"({"fontlist":[],"version":"7.0"})";
+    char *data = static_cast<char *>(malloc(testData.size() + 1));
+    ASSERT_NE(data, nullptr);
+    memcpy_s(data, testData.size() + 1, testData.c_str(), testData.size() + 1);
+    EXPECT_TRUE(this->config_.WriteToFile(data));
+    FontManagerUtils::RemoveFile(FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest087
+ * @tc.desc: Test CheckConfigFile with valid existing file
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest087, TestSize.Level1)
+{
+    ASSERT_EQ(FontManagerUtils::CheckAndInitInstallPath(INSTALL_PATH_TEST), true);
+    std::string result = this->config_.CheckConfigFile(FONT_CONFIG_FILE_TEST);
+    EXPECT_FALSE(result.empty());
+}
+
+/**
+ * @tc.name: FontConfigFuncTest089
+ * @tc.desc: Test RefreshFullNames with fontlist not array (no crash, no modification)
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest089, TestSize.Level1)
+{
+    cJSON *jsonValue = cJSON_Parse(R"({"fontlist":"notarray"})");
+    ASSERT_NE(jsonValue, nullptr);
+    this->config_.RefreshFullNames(jsonValue);
+    // fontlist should still be a string (unchanged) since RefreshFullNames returned early
+    cJSON *fontList = cJSON_GetObjectItem(jsonValue, "fontlist");
+    ASSERT_NE(fontList, nullptr);
+    EXPECT_TRUE(cJSON_IsString(fontList));
+    cJSON_Delete(jsonValue);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest090
+ * @tc.desc: Test RefreshFullNames skips items with missing fontfullpath
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest090, TestSize.Level1)
+{
+    cJSON *jsonValue = cJSON_Parse(R"({"fontlist":[{"other":"x"}]})");
+    ASSERT_NE(jsonValue, nullptr);
+    this->config_.RefreshFullNames(jsonValue);
+    // The item should remain unchanged: "other" still present, no "fullname" added
+    cJSON *fontList = cJSON_GetObjectItem(jsonValue, "fontlist");
+    ASSERT_NE(fontList, nullptr);
+    ASSERT_TRUE(cJSON_IsArray(fontList));
+    cJSON *item = cJSON_GetArrayItem(fontList, 0);
+    ASSERT_NE(item, nullptr);
+    // "other" should still exist (item was skipped, not modified)
+    EXPECT_NE(cJSON_GetObjectItem(item, "other"), nullptr);
+    // "fullname" should NOT have been added (item was skipped)
+    EXPECT_EQ(cJSON_GetObjectItem(item, "fullname"), nullptr);
+    cJSON_Delete(jsonValue);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest091
+ * @tc.desc: Test FontConfig move constructor and assignment
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest091, TestSize.Level1)
+{
+    FontConfig config1(FONT_CONFIG_FILE_TEST);
+    FontConfig config2(std::move(config1));
+    EXPECT_EQ(config2.ConfigPath_, FONT_CONFIG_FILE_TEST);
+    FontConfig config3("/some/other/path.json");
+    config3 = std::move(config2);
+    EXPECT_EQ(config3.ConfigPath_, FONT_CONFIG_FILE_TEST);
+}
+
+/**
+ * @tc.name: FontConfigFuncTest092
+ * @tc.desc: Test FontConfig move assignment to self
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontConfigTest, FontConfigFuncTest092, TestSize.Level1)
+{
+    FontConfig config1(FONT_CONFIG_FILE_TEST);
+    FontConfig& ref = config1;
+    config1 = std::move(ref);
+    EXPECT_EQ(config1.ConfigPath_, FONT_CONFIG_FILE_TEST);
 }
 
 }  // namespace FontManager
