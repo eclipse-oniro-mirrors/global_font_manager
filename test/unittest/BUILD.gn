@@ -75,6 +75,7 @@ ohos_unittest("font_manager_module_test") {
     "../../service/client/src/font_service_load_manager.cpp",
     "../../service/client/src/font_sa_load_callback.cpp",
     "../../service/client/src/data_migration_cb_agent.cpp",
+    "../../service/client/src/font_client_observer_agent.cpp",
     "../../service/inner_api/src/font_manager_kits.cpp",
     "../../service/inner_api/src/font_manager_inner_api.cpp",
   ]
@@ -88,6 +89,7 @@ ohos_unittest("font_manager_module_test") {
     "$_service_gen_dir/data_migration_callback_proxy.cpp",
     "$_service_gen_dir/data_migration_callback_stub.cpp",
     "$_service_gen_dir/idata_migration_callback_event.cpp",
+    "$_service_gen_dir/font_client_observer_stub.cpp",
   ]
 
   include_dirs = [

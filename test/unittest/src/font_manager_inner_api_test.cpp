@@ -93,6 +93,44 @@ HWTEST_F(FontManagerInnerApiTest, InnerApiUninstallFontTest002, TestSize.Level1)
     int32_t ret = FontManagerInnerApi::UninstallFont("NonExistentFont99999", TEST_USERID);
     EXPECT_NE(ret, ERR_OK);
 }
+
+/**
+ * @tc.name: InnerApiInstallFontTest004
+ * @tc.desc: Test InstallFont with valid path
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerInnerApiTest, InnerApiInstallFontTest004, TestSize.Level1)
+{
+    const std::string fontPath = "/data/test/TestFont_Sans.ttf";
+    int32_t ret = FontManagerInnerApi::InstallFont(fontPath, TEST_USERID);
+    // With valid path, PathToRealPath succeeds; service may be null -> ERR_INSTALL_FAIL
+    // or IPC result. Either way, it should not be ERR_FILE_NOT_EXISTS (file exists).
+    EXPECT_NE(ret, ERR_FILE_NOT_EXISTS);
+}
+
+/**
+ * @tc.name: InnerApiUninstallFontTest003
+ * @tc.desc: Test UninstallFont with empty name
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerInnerApiTest, InnerApiUninstallFontTest003, TestSize.Level1)
+{
+    int32_t ret = FontManagerInnerApi::UninstallFont("", TEST_USERID);
+    // Empty name should trigger permission check failure or param error
+    EXPECT_NE(ret, ERR_OK);
+}
+
+/**
+ * @tc.name: InnerApiInstallFontTest005
+ * @tc.desc: Test InstallFont with directory path
+ * @tc.type: FUNC
+ */
+HWTEST_F(FontManagerInnerApiTest, InnerApiInstallFontTest005, TestSize.Level1)
+{
+    int32_t ret = FontManagerInnerApi::InstallFont("/data/test/", TEST_USERID);
+    // Directory path: PathToRealPath succeeds, fopen on directory may fail -> ERR_FILE_NOT_EXISTS
+    EXPECT_NE(ret, ERR_OK);
+}
 } // namespace FontManager
 } // namespace Global
 } // namespace OHOS
